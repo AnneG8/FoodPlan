@@ -138,4 +138,4 @@ dmypy.json
 cython_debug/
 .idea/
 
-bot/migrations
+# bot/migrations/*
