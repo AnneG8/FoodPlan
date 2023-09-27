@@ -19,10 +19,10 @@ class IngredientQuantity(models.Model):
     ingredient = models.ForeignKey(
         Ingredient,
         verbose_name='Ингредиент',
-        on_delete=models.SET_NULL
+        on_delete=models.CASCADE
     )
     meal = models.ForeignKey(
-        Meal,
+        'Meal',
         verbose_name='Блюдо',
         related_name='ingredients_quant',
         on_delete=models.CASCADE
