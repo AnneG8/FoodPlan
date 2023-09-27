@@ -2,4 +2,8 @@
 Желток куриного яйца = 62 ккал/шт
 Белок куриного яйца = 33 ккал/шт
 
-Остальное (что измеряется в г или мл) смотри на http://frs24.ru/st/tablica-kalorijnosti-produktov-pitaniya/ или http://pomni.info/pomni/home/view/kaloriinosti_productov.html
+Остальное (что измеряется в г или мл) смотри на 
+http://frs24.ru/st/tablica-kalorijnosti-produktov-pitaniya/ 
+или 
+http://pomni.info/pomni/home/view/kaloriinosti_productov.html
+и дели на 100

@@ -4,8 +4,10 @@ from django.db import models
 class Ingredient(models.Model):
     name = models.CharField('Имя ингредиента', max_length=20)
     uom = models.CharField('Единицы измерения', max_length=20)
-    # калории на Х грамм продукта
-    # калорий в у. е.
+    сalories_in_uom = models.DecimalField(
+        'Калорийность в ЕИ',
+        max_digits=7, decimal_places=2,
+    )
 
     class Meta:
         verbose_name = 'Ингредиент'
@@ -44,6 +46,9 @@ class IngredientQuantity(models.Model):
         else:
             return f'{self.quantity}{self.ingredient.uom}'
 
+    def get_caloric_value(self):
+        return int(self.ingredient.сalories_in_uom * self.quantity)
+
 
 class MealType(models.Model):
     type_name = models.CharField('Название', max_length=20)
@@ -79,10 +84,15 @@ class Meal(models.Model):
     def __str__(self):
         return f'{self.type_of_meal} {self.name}'
 
+    def get_caloric_value(self):
+        return sum(ingredient.get_caloric_value() 
+                   for ingredient in self.ingredients_quant)
+
 
 class Settings(models.Model):
     # виды - все
-    # ингридиенты - все
+    # исключить ингридиенты 
+    # добавить ингридиенты
     # минимальная калорийность
     # максимальная калорийность
 
