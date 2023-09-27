@@ -12,7 +12,7 @@ class Ingredient(models.Model):
         verbose_name_plural = 'Ингредиенты'
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
 
 class IngredientQuantity(models.Model):
@@ -52,6 +52,9 @@ class MealType(models.Model):
         verbose_name = 'Тип блюда'
         verbose_name_plural = 'Типы блюд'
 
+    def __str__(self):
+        return self.type_name
+
 
 class Meal(models.Model):
     name = models.CharField('Название', max_length=40)
@@ -72,6 +75,9 @@ class Meal(models.Model):
     class Meta:
         verbose_name = 'Блюдо'
         verbose_name_plural = 'Блюда'
+
+    def __str__(self):
+        return f'{self.type_of_meal} {self.name}'
 
 
 class Settings(models.Model):
@@ -122,5 +128,5 @@ class Client(models.Model):
         verbose_name = 'Клиент'
         verbose_name_plural = 'Клиенты'
 
-
-
+    def __str__(self):
+        return self.name
