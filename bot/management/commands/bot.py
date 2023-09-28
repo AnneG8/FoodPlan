@@ -3,12 +3,7 @@ import telegram
 import os
 from pathlib import Path
 import sys
-#os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FoodPlan.settings')
-
-#path_root = Path(__file__).parents[2]
-#sys.path.append(str(path_root))
-#print(sys.path)
-from bot.models import Meal
+from bot.models import *
 from telegram import Update
 from django.core.management.base import BaseCommand
 from django.db.models import Q, Count
@@ -33,167 +28,184 @@ from telegram.ext import (
 )
 
 
-def cancel(update, context): pass
-def paid(update, context): pass
+class Command(BaseCommand):
+    def handle(self, *args, **kwargs):
+        load_dotenv()
 
+        tg_token = os.getenv("TG_BOT_TOKEN")
+        updater = Updater(token=tg_token, use_context=True)
+        dispatcher = updater.dispatcher
 
-def start_conversation(update, context):
-    query = update.callback_query
-    user_first_name = update.effective_user.first_name
-    user_id = update.effective_user.id
-    context.user_data['user_first_name'] = user_first_name
-    context.user_data['user_id'] = user_id
+        def cancel(update, context): pass
+        def paid(update, context): pass
 
-    keyboard = [
-        [
-            InlineKeyboardButton("Попробовать бесплатно", callback_data='to_menu'),
-            InlineKeyboardButton("Оплатить доступ", callback_data='to_payment'),
-        ]
+        def start_conversation(update, context):
+            query = update.callback_query
+            user_first_name = update.effective_user.first_name
+            user_id = update.effective_user.id
+            context.user_data['user_first_name'] = user_first_name
+            context.user_data['user_id'] = user_id
 
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.effective_message.reply_photo(
-        photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/greetings.jpg', 'rb'),
-        caption=f"""Шефом может стать каждый!
-Поможем быстро и легко приготовить блюдо дня!""",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
-    return 'GREETINGS'
+            keyboard = [
+                [
+                    InlineKeyboardButton("Попробовать бесплатно", callback_data='to_menu'),
+                    InlineKeyboardButton("Оплатить доступ", callback_data='to_payment'),
+                ]
 
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.effective_message.reply_photo(
+                photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/greetings.jpg', 'rb'),
+                caption=f"""Шефом может стать каждый!
+        Поможем быстро и легко приготовить блюдо дня!""",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            for meal in Meal.objects.all():
+                print(meal.id)
+            return 'GREETINGS'
 
-def menu(update, context):
-    query = update.callback_query
-    user_first_name = update.effective_user.first_name
-    user_id = update.effective_user.id
-    context.user_data['user_first_name'] = user_first_name
-    context.user_data['user_id'] = user_id
+        def menu(update, context):
+            query = update.callback_query
+            user_first_name = update.effective_user.first_name
+            user_id = update.effective_user.id
+            context.user_data['user_first_name'] = user_first_name
+            context.user_data['user_id'] = user_id
+            context.user_data["cur_dish_id"] = 1
 
-    keyboard = [
-        [
-            InlineKeyboardButton("Выбрать блюдо", callback_data='to_dishes'),
-            InlineKeyboardButton("Настроить фильтр", callback_data='to_filters'),
-        ],
-        [
-            InlineKeyboardButton("Оплатить доступ", callback_data='to_payment')
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.effective_message.reply_text(
-        text=f"""Вы в основном меню""",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
-    return 'MAIN_MENU'
+            keyboard = [
+                [
+                    InlineKeyboardButton("Выбрать блюдо", callback_data='to_dishes'),
+                    InlineKeyboardButton("Настроить фильтр", callback_data='to_filters'),
+                ],
+                [
+                    InlineKeyboardButton("Оплатить доступ", callback_data='to_payment')
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.effective_message.reply_text(
+                text=f"""Вы в основном меню""",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return 'MAIN_MENU'
 
+        def show_dishes(update, context):
+            query = update.callback_query
+            user_first_name = update.effective_user.first_name
+            user_id = update.effective_user.id
+            context.user_data['user_first_name'] = user_first_name
+            context.user_data['user_id'] = user_id
 
-def show_dishes(update, context):
-    query = update.callback_query
-    user_first_name = update.effective_user.first_name
-    user_id = update.effective_user.id
-    context.user_data['user_first_name'] = user_first_name
-    context.user_data['user_id'] = user_id
+            keyboard = [
+                [
+                    InlineKeyboardButton("<", callback_data='prev_dish'),
+                    InlineKeyboardButton("Подробнее", callback_data='dish_info'),
+                    InlineKeyboardButton(">", callback_data='next_dish'),
+                ],
+                [
+                    InlineKeyboardButton("В главное меню", callback_data='menu'),
+                ],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            cur_meal = Meal.objects.get(id=context.user_data["cur_dish_id"])
+            #print(Meal.objects.all())
+            update.effective_message.reply_photo(
+                photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/borsh-so-smetanoj.jpg', 'rb'),
+                caption=f"""{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}""",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return 'CUR_DISH'
 
-    keyboard = [
-        [
-            InlineKeyboardButton("<", callback_data='prev_dish'),
-            InlineKeyboardButton("Подробнее", callback_data='dish_info'),
-            InlineKeyboardButton(">", callback_data='next_dish'),
-        ],
-        [
-            InlineKeyboardButton("В главное меню", callback_data='menu'),
-        ],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.effective_message.reply_photo(
-        photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/borsh-so-smetanoj.jpg', 'rb'),
-        caption=f"""Борщ классический""",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
-    return 'CUR_DISH'
+        def cur_dish_info(update, context):
+            query = update.callback_query
+            user_first_name = update.effective_user.first_name
+            user_id = update.effective_user.id
+            context.user_data['user_first_name'] = user_first_name
+            context.user_data['user_id'] = user_id
 
+            keyboard = [
+                [
+                    InlineKeyboardButton("<", callback_data='prev_dish'),
+                    InlineKeyboardButton(">", callback_data='next_dish'),
+                ],
+                [
+                    InlineKeyboardButton("Рассчитать стоимость продуктов", callback_data='calculate_cost'),
+                ],
+                [
+                    InlineKeyboardButton("В главное меню", callback_data='menu'),
+                ],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            cur_meal = Meal.objects.get(id=context.user_data["cur_dish_id"])
+            text = ""
+            text += f"{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}\n{cur_meal.description}\n\n"
+            text += "Ингридиенты:\n"
+            for ingredient_quant in cur_meal.ingredients_quant.all():
+                text += f"\t{ingredient_quant.ingredient.name} {ingredient_quant.quantity}{ingredient_quant.ingredient.uom}\n"
+            text += "\n\n"
+            text += cur_meal.recipe
 
-def cur_dish_info(update, context):
-    query = update.callback_query
-    user_first_name = update.effective_user.first_name
-    user_id = update.effective_user.id
-    context.user_data['user_first_name'] = user_first_name
-    context.user_data['user_id'] = user_id
+            update.effective_message.reply_photo(
+                photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/borsh-so-smetanoj.jpg', 'rb'),#cur_meal.image
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return 'DISH_INFO'
 
-    keyboard = [
-        [
-            InlineKeyboardButton("<", callback_data='prev_dish'),
-            InlineKeyboardButton(">", callback_data='next_dish'),
-        ],
-        [
-            InlineKeyboardButton("Рассчитать стоимость продуктов", callback_data='calculate_cost'),
-        ],
-        [
-            InlineKeyboardButton("В главное меню", callback_data='menu'),
-        ],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    text = ""
-    text += f"{models.Meal.objects.get(id=cur_dish_id).name}. Тип блюда - {models.Meal.objects.get(id=cur_dish_id).type_of_meal.type_name}"
-    text += "Ингридиенты:\n"
-    for ingredient_quant in models.Meal.objects.get(id=cur_dish_id).ingredients_quant:
-        text += f"\t{ingredient_quant.ingredient.name} {ingredient_quant.quantity}{ingredient_quant.ingredient.uom}\n"
+        def next_dish(update, context):
+            if context.user_data["cur_dish_id"] < Meal.objects.all().count():
+                print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                context.user_data["cur_dish_id"] += 1
+                print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                return show_dishes(update, context)
 
-    update.effective_message.reply_photo(
-        photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/borsh-so-smetanoj.jpg', 'rb'),
-        caption=text,
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
-    return 'DISH_INFO'
+        def prev_dish(update, context):
+            if context.user_data["cur_dish_id"] > 1:
+                print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                context.user_data["cur_dish_id"] -= 1
+                print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                return show_dishes(update, context)
 
+        def show_filters(update, context): pass
+        def calculate_cost(update, context): pass
 
-def next_dish(update, context): pass
-def prev_dish(update, context): pass
-def show_filters(update, context): pass
-def calculate_cost(update, context): pass
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start_conversation)],
+            states={
+                'GREETINGS': [
+                    CallbackQueryHandler(menu, pattern='to_menu'),
+                    CallbackQueryHandler(paid, pattern='to_payment'),
+                ],
+                'MAIN_MENU': [
+                    CallbackQueryHandler(show_dishes, pattern='to_dishes'),
+                    CallbackQueryHandler(show_filters, pattern='to_filters'),
+                    CallbackQueryHandler(paid, pattern='to_payment'),
+                ],
+                'CUR_DISH': [
+                    CallbackQueryHandler(prev_dish, pattern='prev_dish'),
+                    CallbackQueryHandler(next_dish, pattern='next_dish'),
+                    CallbackQueryHandler(cur_dish_info, pattern='dish_info'),
+                    CallbackQueryHandler(menu, pattern='menu'),
+                ],
+                'DISH_INFO': [
+                    CallbackQueryHandler(prev_dish, pattern='prev_dish'),
+                    CallbackQueryHandler(next_dish, pattern='next_dish'),
+                    CallbackQueryHandler(calculate_cost, pattern='calculate_cost'),
+                    CallbackQueryHandler(menu, pattern='menu'),
+                ],
+            },
+            fallbacks=[CommandHandler('cancel', cancel)]
+        )
+        cur_dish_id = 1
 
+        dispatcher.add_handler(conv_handler)
+        dispatcher.bot_data["cur_dish_id"] = 1
+        start_handler = CommandHandler('start', start_conversation)
+        dispatcher.add_handler(start_handler)
+        dispatcher.add_handler(CallbackQueryHandler(start_conversation, pattern='to_start'))
+        updater.start_polling()
+        updater.idle()
 
-if __name__ == "__main__":
-    load_dotenv()
-
-    tg_token = os.getenv("TG_BOT_TOKEN")
-    updater = Updater(token=tg_token, use_context=True)
-    dispatcher = updater.dispatcher
-
-    conv_handler = ConversationHandler(
-                entry_points=[CommandHandler('start', start_conversation)],
-                states={
-                    'GREETINGS': [
-                        CallbackQueryHandler(menu, pattern='to_menu'),
-                        CallbackQueryHandler(paid, pattern='to_payment'),
-                    ],
-                    'MAIN_MENU': [
-                        CallbackQueryHandler(show_dishes, pattern='to_dishes'),
-                        CallbackQueryHandler(show_filters, pattern='to_filters'),
-                        CallbackQueryHandler(paid, pattern='to_payment'),
-                    ],
-                    'CUR_DISH': [
-                        CallbackQueryHandler(prev_dish, pattern='prev_dish'),
-                        CallbackQueryHandler(next_dish, pattern='next_dish'),
-                        CallbackQueryHandler(cur_dish_info, pattern='dish_info'),
-                        CallbackQueryHandler(menu, pattern='menu'),
-                    ],
-                    'DISH_INFO': [
-                        CallbackQueryHandler(prev_dish, pattern='prev_dish'),
-                        CallbackQueryHandler(next_dish, pattern='next_dish'),
-                        CallbackQueryHandler(calculate_cost, pattern='calculate_cost'),
-                        CallbackQueryHandler(menu, pattern='menu'),
-                    ],
-                },
-                fallbacks=[CommandHandler('cancel', cancel)]
-    )
-    cur_dish_id = 0
-
-    dispatcher.add_handler(conv_handler)
-    start_handler = CommandHandler('start', start_conversation)
-    dispatcher.add_handler(start_handler)
-    dispatcher.add_handler(CallbackQueryHandler(start_conversation, pattern='to_start'))
-    updater.start_polling()
-    updater.idle()
