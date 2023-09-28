@@ -36,7 +36,7 @@ class IngredientQuantity(models.Model):
         verbose_name_plural = 'Количество ингредиентов'
 
     def __str__(self):
-        return f'{self.ingredient} - {convert_units()}'
+        return f'{self.ingredient} - {self.convert_units()}'
 
     def convert_units(self):
         if self.ingredient.uom == 'г' and self.quantity >= 1000:
@@ -63,6 +63,7 @@ class MealType(models.Model):
 
 class Meal(models.Model):
     name = models.CharField('Название', max_length=40)
+    image = models.ImageField('Изображение', null=True, blank=True)
     description = models.TextField('Описание', null=True, blank=True)
     type_of_meal = models.ForeignKey(
         MealType,
@@ -71,7 +72,6 @@ class Meal(models.Model):
         on_delete=models.CASCADE
     )
     # ingredients_quant
-    image = models.ImageField('Изображение', null=True, blank=True)
     recipe = models.TextField('Рецепт')
     is_recommended = models.BooleanField('Рекомендуемое', default=False)
     # кол-во порций
