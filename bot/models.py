@@ -62,7 +62,7 @@ class MealType(models.Model):
 
 
 class Meal(models.Model):
-    name = models.CharField('Название', max_length=40)
+    name = models.CharField('Название', max_length=80)
     image = models.ImageField('Изображение', null=True, blank=True)
     description = models.TextField('Описание', null=True, blank=True)
     type_of_meal = models.ForeignKey(

@@ -19,11 +19,10 @@ class IngredientAdmin(admin.ModelAdmin):
 
 @admin.register(Meal)
 class MealAdmin(admin.ModelAdmin):
-    search_fields = ['name',] # type_of_meal,
+    search_fields = ['name',] 
     list_display = ['name', 'type_of_meal', 'is_recommended',] # количество калорий
     list_editable = ['is_recommended',]
     list_filter = ['is_recommended', 'type_of_meal',]
-    raw_id_fields = ('type_of_meal', ) # заменить, чтобы показывался тип а не id
     inlines = [IngredientQuantityInline,]
 
 
