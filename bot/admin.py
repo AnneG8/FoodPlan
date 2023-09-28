@@ -1,10 +1,6 @@
 from django.contrib import admin
 from bot.models import Ingredient, MealType, Meal, Client, IngredientQuantity
 
-# admin.site.register(Ingredient)
-# admin.site.register(Client)
-# admin.site.register(Meal)
-
 
 class IngredientQuantityInline(admin.TabularInline):
     model = IngredientQuantity
@@ -20,7 +16,7 @@ class IngredientAdmin(admin.ModelAdmin):
 @admin.register(Meal)
 class MealAdmin(admin.ModelAdmin):
     search_fields = ['name',] 
-    list_display = ['name', 'type_of_meal', 'is_recommended',] # количество калорий
+    list_display = ['name', 'type_of_meal', 'get_caloric_value', 'is_recommended',] # количество калорий 'сalories',
     list_editable = ['is_recommended',]
     list_filter = ['is_recommended', 'type_of_meal',]
     inlines = [IngredientQuantityInline,]
