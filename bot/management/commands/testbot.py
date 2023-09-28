@@ -33,6 +33,13 @@ if __name__ == "__main__":
     load_dotenv()
 
     tg_token = os.getenv("TG_BOT_TOKEN")
+    payment_token = os.getenv("PAYMENT_TOKEN")
+
+    bot = telegram.Bot(token='TG_BOT_TOKEN')
+
+    updates = bot.get_updates()
+    print(updates[0])
+
     # updater = Updater(token=tg_token, use_context=True)
     # dispatcher = updater.dispatcher
 
