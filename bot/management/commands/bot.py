@@ -53,6 +53,34 @@ if __name__ == "__main__":
     )
 
 
+    def process_pre_checkout_query(update, context):
+        query = update.pre_checkout_query
+        try:
+            pass
+        except:
+            context.bot.answer_pre_checkout_query(
+                pre_checkout_query_id=query.id,
+                ok=False,
+                error_message="Что-то пошло не так...",
+            )
+        else:
+            context.bot.answer_pre_checkout_query(query.id, ok=True)
+
+
+    def success_payment(update, context):
+        '''Обработка успешной оплаты'''
+        amount = update.message.successful_payment.total_amount / 100
+        text = f'✅ Спасибо за оплату {amount} руб.!\n\n'
+        keyboard = [
+            [InlineKeyboardButton("На главную", callback_data="to_start")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text(
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=telegram.ParseMode.HTML,
+        )
+
     # updater = Updater(token=tg_token, use_context=True)
     # dispatcher = updater.dispatcher
 
