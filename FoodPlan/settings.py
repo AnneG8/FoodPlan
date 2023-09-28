@@ -29,10 +29,11 @@ SECRET_KEY = env.str('SECRET_KEY', 'REPLACE_ME')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', False)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', [])
-
+#ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', [])
+ALLOWED_HOSTS = ['*',]
 
 # Application definition
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',

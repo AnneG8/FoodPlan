@@ -8,7 +8,7 @@ import sys
 #path_root = Path(__file__).parents[2]
 #sys.path.append(str(path_root))
 #print(sys.path)
-from bot.models import Meal
+from models import Meal
 from telegram import Update
 from django.core.management.base import BaseCommand
 from django.db.models import Q, Count
