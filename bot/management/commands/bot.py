@@ -163,11 +163,19 @@ class Command(BaseCommand):
             return 'DISH_INFO'
 
         def next_dish(update, context):
-            if context.user_data["cur_dish_id"] < Meal.objects.all().count():
-                print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
-                context.user_data["cur_dish_id"] += 1
-                print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
-                return show_dishes(update, context)
+            cur_client = Client.objects.get(id_telegram=context.user_data["user_id"])
+            if cur_client.is_paid_up:
+                if context.user_data["cur_dish_id"] < Meal.objects.all().count():
+                    print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                    context.user_data["cur_dish_id"] += 1
+                    print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                    return show_dishes(update, context)
+            else:
+                if context.user_data["cur_dish_id"] < 3:
+                    print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                    context.user_data["cur_dish_id"] += 1
+                    print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                    return show_dishes(update, context)
 
         def prev_dish(update, context):
             if context.user_data["cur_dish_id"] > 1:
