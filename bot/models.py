@@ -99,9 +99,18 @@ class Client(models.Model):
         null=True,
         blank=True
     )
+    renew_sub = models.BooleanField(
+        'Продление подписки',
+        default=False
+    )
     is_paid_up = models.BooleanField(
         'Оплата подписки',
         default=False
+    )
+    payment_date = models.DateField(
+        'День оплаты',
+        null=True,
+        blank=True
     )
     likes = models.ManyToManyField(
         Meal,
@@ -166,7 +175,11 @@ class Settings(models.Model):
 
 
 class Revenue(models.Model):
-
+    # month = models.DateField(
+    #     'Месяц',
+    #     default=
+    # )
+    # max_сalories = models.IntegerField('Максимум калорий', default=0)
     class Meta:
         verbose_name = 'Выручка за месяц'
         verbose_name_plural = 'Выручка'
