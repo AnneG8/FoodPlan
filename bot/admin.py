@@ -35,7 +35,7 @@ class ClientAdmin(admin.ModelAdmin):
 @admin.register(Revenue)
 class RevenueAdmin(admin.ModelAdmin):
     ordering = ['-month',]
-    readonly_fields = ['month', 'max_сalories',]
+    readonly_fields = ['month', 'revenue_sum',]
 
 
 admin.site.register(MealType)

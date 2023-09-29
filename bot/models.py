@@ -1,7 +1,7 @@
 import sys
 
 from django.db import models
-from datetime import timedelta, date
+from datetime import date
 
 
 class Ingredient(models.Model):
@@ -9,7 +9,8 @@ class Ingredient(models.Model):
     uom = models.CharField('Единицы измерения', max_length=20)
     сalories_in_uom = models.DecimalField(
         'Калорийность в ЕИ',
-        max_digits=7, decimal_places=2,
+        max_digits=7,
+        decimal_places=2,
     )
 
     class Meta:
@@ -88,7 +89,7 @@ class Meal(models.Model):
         return f'{self.type_of_meal} {self.name}'
 
     def get_caloric_value(self):
-        return sum(ingredient.get_caloric_value() 
+        return sum(ingredient.get_caloric_value()
                    for ingredient in self.ingredients_quant.all())
     get_caloric_value.short_description = 'Калории'
 
@@ -161,13 +162,13 @@ class Settings(models.Model):
         blank=True
     )
     min_сalories = models.IntegerField(
-        'Минимум калорий', 
-        null=True, 
+        'Минимум калорий',
+        null=True,
         blank=True
     )
     max_сalories = models.IntegerField(
         'Максимум калорий',
-        null=True, 
+        null=True,
         blank=True
     )
     # db_index
@@ -182,8 +183,8 @@ class Revenue(models.Model):
         'Месяц',
         default=date.today().replace(day=1)
     )
-    max_сalories = models.IntegerField('Максимум калорий', default=0)
+    revenue_sum = models.IntegerField('Выручки за месяц', default=0)
+
     class Meta:
         verbose_name = 'Выручка за месяц'
         verbose_name_plural = 'Выручка'
-
