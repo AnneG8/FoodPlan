@@ -1,5 +1,6 @@
 from django.contrib import admin
-from bot.models import Ingredient, MealType, Meal, Client, IngredientQuantity
+from bot.models import (Ingredient, MealType, Meal, Client, 
+                        IngredientQuantity, Revenue)
 
 
 class IngredientQuantityInline(admin.TabularInline):
@@ -29,6 +30,12 @@ class ClientAdmin(admin.ModelAdmin):
     list_display = ['id_telegram', 'name', 'is_paid_up',]    #telegram_url
     list_filter = ['is_paid_up',]
     raw_id_fields = ('likes', 'dislikes', )
+
+
+@admin.register(Revenue)
+class RevenueAdmin(admin.ModelAdmin):
+    ordering = ['-month',]
+    readonly_fields = ['month', 'max_сalories',]
 
 
 admin.site.register(MealType)

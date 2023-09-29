@@ -1,4 +1,5 @@
 from django.db import models
+from datetime import timedelta, date
 
 
 class Ingredient(models.Model):
@@ -175,11 +176,11 @@ class Settings(models.Model):
 
 
 class Revenue(models.Model):
-    # month = models.DateField(
-    #     'Месяц',
-    #     default=
-    # )
-    # max_сalories = models.IntegerField('Максимум калорий', default=0)
+    month = models.DateField(
+        'Месяц',
+        default=date.today().replace(day=1)
+    )
+    max_сalories = models.IntegerField('Максимум калорий', default=0)
     class Meta:
         verbose_name = 'Выручка за месяц'
         verbose_name_plural = 'Выручка'
