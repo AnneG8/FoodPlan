@@ -38,10 +38,6 @@ def cancel(update, context): pass
 
 
 def send_invoice(update, context):
-    # selected_cake = context.user_data.get('selected_cake')
-    # selected_order = context.user_data.get('order')
-    # price_in_rubles = float(selected_order.order_price)
-    # amount_in_kopecks = int(price_in_rubles * 100)
     # token_pay = settings.token_pay # ЗАМЕНИЛ СТРОКУ
     token_pay = payment_token
 
@@ -54,15 +50,15 @@ def send_invoice(update, context):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_invoice(
-        chat_id=user_id,
+        chat_id=chat_id,
         title="Оплата подписки",
         description="Оплата подписки пользователя на 12 месяцев",
         payload='payload',
-        provider_token=payment_token,
+        provider_token=token_pay,
         currency='RUB',
         # need_phone_number=False,
         # need_email=False,
-        # is_flexible=False,
+        is_flexible=False,
         prices=[LabeledPrice(label='Оплата подписки', amount=20000)],
         reply_markup=reply_markup,
         start_parameter='test',
@@ -106,27 +102,7 @@ if __name__ == "__main__":
 
     tg_token = os.getenv("TG_BOT_TOKEN")
     payment_token = os.getenv("PAYMENT_TOKEN")
-    user_id = 6166975700
-    # bot = telegram.Bot(token=tg_token)
-
-    # updates = bot.get_updates()
-    # print(updates[0])
-    # bot.send_message(text='Hi John!', chat_id=user_id)
-
-    # bot.send_invoice(
-    #     chat_id=user_id,
-    #     title="Оплата подписки",
-    #     description="Оплата подписки пользователя на 12 месяцев",
-    #     payload='payload',
-    #     provider_token=payment_token,
-    #     currency='RUB',
-    #     # need_phone_number=False,
-    #     # need_email=False,
-    #     # is_flexible=False,
-    #     prices=[LabeledPrice(label='Оплата подписки', amount=50000)],
-    #     # reply_markup=reply_markup,
-    #     start_parameter='test',
-    # )
+#    user_id = 6166975700 # это для теста
 
 
     updater = Updater(token=tg_token, use_context=True)
@@ -149,28 +125,6 @@ if __name__ == "__main__":
                         CallbackQueryHandler(start_conversation,
                                              pattern='to_start'),
                     ],
-
-                    # 'GREETINGS': [
-                    #     CallbackQueryHandler(menu, pattern='to_menu'),
-                    #     CallbackQueryHandler(paid, pattern='to_payment'),
-                    # ],
-                    # 'MAIN_MENU': [
-                    #     CallbackQueryHandler(show_dishes, pattern='to_dishes'),
-                    #     CallbackQueryHandler(show_filters, pattern='to_filters'),
-                    #     CallbackQueryHandler(paid, pattern='to_payment'),
-                    # ],
-                    # 'CUR_DISH': [
-                    #     CallbackQueryHandler(prev_dish, pattern='prev_dish'),
-                    #     CallbackQueryHandler(next_dish, pattern='next_dish'),
-                    #     CallbackQueryHandler(cur_dish_info, pattern='dish_info'),
-                    #     CallbackQueryHandler(menu, pattern='menu'),
-                    # ],
-                    # 'DISH_INFO': [
-                    #     CallbackQueryHandler(prev_dish, pattern='prev_dish'),
-                    #     CallbackQueryHandler(next_dish, pattern='next_dish'),
-                    #     CallbackQueryHandler(calculate_cost, pattern='calculate_cost'),
-                    #     CallbackQueryHandler(menu, pattern='menu'),
-                    # ],
                 },
                 fallbacks=[CommandHandler('cancel', cancel)],
                 per_chat=False  # Добавили эту строку для решения проблем с оплатой
