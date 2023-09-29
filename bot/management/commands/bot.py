@@ -1,5 +1,6 @@
 import datetime
 import telegram
+
 import os
 #from bot.models import *
 from telegram import Update
@@ -63,25 +64,31 @@ def send_invoice(update, context):
         reply_markup=reply_markup,
         start_parameter='test',
     )
+    print("invoice end")
     return 'SUCCESS_PAYMENT'
 
 
 def process_pre_checkout_query(update, context):
+    print("pre_checkout start")
     query = update.pre_checkout_query
     try:
         pass
+        print("pre_checkout pass")
     except:
+        print("pre_checkout except")
         context.bot.answer_pre_checkout_query(
             pre_checkout_query_id=query.id,
             ok=False,
             error_message="Что-то пошло не так...",
         )
     else:
+        print("pre_checkout else")
         context.bot.answer_pre_checkout_query(query.id, ok=True)
 
 
 def success_payment(update, context):
     '''Обработка успешной оплаты'''
+    print("success_payment start")
     amount = update.message.successful_payment.total_amount / 100
     text = f'✅ Спасибо за оплату {amount} руб.!\n\n'
     keyboard = [
@@ -93,7 +100,7 @@ def success_payment(update, context):
         reply_markup=reply_markup,
         parse_mode=telegram.ParseMode.HTML,
     )
-
+    print("success_payment end")
     return 'SUCCESS_PAYMENT'
 
 
