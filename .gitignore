@@ -26,6 +26,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 .vscode
+.idea/
+media/
+staticfiles/
 
 
 # PyInstaller
@@ -139,3 +142,9 @@ cython_debug/
 .idea/
 
 # bot/migrations/*
+/photo_2023-09-29_16-10-18.jpg
+/photo_2023-09-29_16-10-38.jpg
+/photo_2023-09-29_16-10-42.jpg
+/photo_2023-09-29_16-10-46.jpg
+/photo_2023-09-29_16-10-49.jpg
+/photo_2023-09-29_16-10-53.jpg

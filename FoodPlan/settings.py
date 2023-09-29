@@ -36,6 +36,7 @@ SUBS_PRICE = env("SUBS_PRICE")
 
 # Application definition
 
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
