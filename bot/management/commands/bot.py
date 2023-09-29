@@ -46,6 +46,13 @@ class Command(BaseCommand):
             context.user_data['user_first_name'] = user_first_name
             context.user_data['user_id'] = user_id
 
+            if not Client.objects.filter(id_telegram=user_id).exists():
+                Client.objects.create(
+                    id_telegram=user_id,
+                    name=user_first_name,
+                    is_paid_up=False
+                )
+
             keyboard = [
                 [
                     InlineKeyboardButton("Попробовать бесплатно", callback_data='to_menu'),
@@ -111,7 +118,7 @@ class Command(BaseCommand):
             cur_meal = Meal.objects.get(id=context.user_data["cur_dish_id"])
             #print(Meal.objects.all())
             update.effective_message.reply_photo(
-                photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/borsh-so-smetanoj.jpg', 'rb'),
+                photo=cur_meal.image,
                 caption=f"""{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}""",
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
@@ -142,13 +149,13 @@ class Command(BaseCommand):
             text = ""
             text += f"{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}\n{cur_meal.description}\n\n"
             text += "Ингридиенты:\n"
-            for ingredient_quant in cur_meal.ingredients_quant.all():
-                text += f"\t{ingredient_quant.ingredient.name} {ingredient_quant.quantity}{ingredient_quant.ingredient.uom}\n"
+            for ind, ingredient_quant in enumerate(cur_meal.ingredients_quant.all()):
+                text += f"\t\t{ind+1}. {ingredient_quant.ingredient.name} {ingredient_quant.quantity}{ingredient_quant.ingredient.uom}\n"
             text += "\n\n"
             text += cur_meal.recipe
 
             update.effective_message.reply_photo(
-                photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/borsh-so-smetanoj.jpg', 'rb'),#cur_meal.image
+                photo=cur_meal.image,
                 caption=text,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML

@@ -27,7 +27,8 @@ share/python-wheels/
 MANIFEST
 .vscode
 .idea/
-.media/
+media/
+staticfiles/
 
 
 # PyInstaller
