@@ -1,6 +1,7 @@
 import sys
 
 from django.db import models
+from datetime import date
 
 
 class Ingredient(models.Model):
@@ -8,7 +9,8 @@ class Ingredient(models.Model):
     uom = models.CharField('Единицы измерения', max_length=20)
     сalories_in_uom = models.DecimalField(
         'Калорийность в ЕИ',
-        max_digits=7, decimal_places=2,
+        max_digits=7,
+        decimal_places=2,
     )
 
     class Meta:
@@ -91,18 +93,6 @@ class Meal(models.Model):
                    for ingredient in self.ingredients_quant.all())
 
 
-class Settings(models.Model):
-    # виды - все
-    # исключить ингридиенты
-    # добавить ингридиенты
-    # минимальная калорийность
-    # максимальная калорийность
-
-    class Meta:
-        verbose_name = 'Настройки'
-        verbose_name_plural = 'Настройки'
-
-
 class Client(models.Model):
     id_telegram = models.CharField('Телеграм id', max_length=20)
     name = models.CharField('Имя', max_length=30)
@@ -112,9 +102,18 @@ class Client(models.Model):
         null=True,
         blank=True
     )
+    renew_sub = models.BooleanField(
+        'Продление подписки',
+        default=False
+    )
     is_paid_up = models.BooleanField(
         'Оплата подписки',
         default=False
+    )
+    payment_date = models.DateField(
+        'День оплаты',
+        null=True,
+        blank=True
     )
     likes = models.ManyToManyField(
         Meal,
@@ -128,13 +127,6 @@ class Client(models.Model):
         related_name='disliked_by',
         blank=True
     )
-    settings = models.OneToOneField(
-        Settings,
-        verbose_name='Настройки',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
-    )
 
     class Meta:
         verbose_name = 'Клиент'
@@ -142,3 +134,56 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Settings(models.Model):
+    client = models.OneToOneField(
+        Client,
+        verbose_name='Клиент',
+        related_name='settings',
+        on_delete=models.CASCADE
+    )
+    type_of_meal = models.ManyToManyField(
+        MealType,
+        verbose_name='Запрещенные типы блюд',
+        blank=True
+    )
+    excluded_ingrs = models.ManyToManyField(
+        Ingredient,
+        verbose_name='Исключить ингредиенты',
+        related_name='excluded_ingrs',
+        blank=True
+    )
+    chosen_ingrs = models.ManyToManyField(
+        Ingredient,
+        verbose_name='Обязательно наличие ингредиентов',
+        related_name='chosen_ingrs',
+        blank=True
+    )
+    min_сalories = models.IntegerField(
+        'Минимум калорий',
+        null=True,
+        blank=True
+    )
+    max_сalories = models.IntegerField(
+        'Максимум калорий',
+        null=True,
+        blank=True
+    )
+    # db_index
+
+    class Meta:
+        verbose_name = 'Настройки'
+        verbose_name_plural = 'Настройки'
+
+
+class Revenue(models.Model):
+    month = models.DateField(
+        'Месяц',
+        default=date.today().replace(day=1)
+    )
+    revenue_sum = models.IntegerField('Выручки за месяц', default=0)
+
+    class Meta:
+        verbose_name = 'Выручка за месяц'
+        verbose_name_plural = 'Выручка'
