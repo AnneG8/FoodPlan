@@ -5,13 +5,15 @@ from bot.models import (Ingredient, MealType, Meal, Client,
 
 class IngredientQuantityInline(admin.TabularInline):
     model = IngredientQuantity
-    fields = ['ingredient', 'quantity']
+    extra = 1
+    fields = ['ingredient', 'quantity', ] #'ingredient__uom',
 
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
     search_fields = ['name',]
     list_display = ['name', ]
+    ordering = ['name',]
 
 
 @admin.register(Meal)

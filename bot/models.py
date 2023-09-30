@@ -5,7 +5,7 @@ from datetime import date
 
 
 class Ingredient(models.Model):
-    name = models.CharField('Имя ингредиента', max_length=20)
+    name = models.CharField('Имя ингредиента', max_length=20, unique=True)
     uom = models.CharField('Единицы измерения', max_length=20)
     сalories_in_uom = models.DecimalField(
         'Калорийность в ЕИ',
