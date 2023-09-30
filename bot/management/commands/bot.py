@@ -63,8 +63,7 @@ class Command(BaseCommand):
             reply_markup = InlineKeyboardMarkup(keyboard)
             update.effective_message.reply_photo(
                 photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/greetings.jpg', 'rb'),
-                caption=f"""Шефом может стать каждый!
-        Поможем быстро и легко приготовить блюдо дня!""",
+                caption=f"""<b>Шефом может стать каждый!\nПоможем быстро и легко приготовить блюдо дня!</b>""",
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
@@ -106,9 +105,9 @@ class Command(BaseCommand):
 
             keyboard = [
                 [
-                    InlineKeyboardButton("<", callback_data='prev_dish'),
-                    InlineKeyboardButton("Подробнее", callback_data='dish_info'),
-                    InlineKeyboardButton(">", callback_data='next_dish'),
+                    InlineKeyboardButton("<<", callback_data='prev_dish'),
+                    InlineKeyboardButton("Рецепт", callback_data='dish_info'),
+                    InlineKeyboardButton(">>", callback_data='next_dish'),
                 ],
                 [
                     InlineKeyboardButton("В главное меню", callback_data='menu'),
@@ -116,7 +115,6 @@ class Command(BaseCommand):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             cur_meal = Meal.objects.get(id=context.user_data["cur_dish_id"])
-            #print(Meal.objects.all())
             update.effective_message.reply_photo(
                 photo=cur_meal.image,
                 caption=f"""{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}""",
@@ -134,20 +132,17 @@ class Command(BaseCommand):
 
             keyboard = [
                 [
-                    InlineKeyboardButton("<", callback_data='prev_dish'),
-                    InlineKeyboardButton(">", callback_data='next_dish'),
-                ],
-                [
                     InlineKeyboardButton("Рассчитать стоимость продуктов", callback_data='calculate_cost'),
                 ],
                 [
-                    InlineKeyboardButton("В главное меню", callback_data='menu'),
+                    InlineKeyboardButton("К выбору блюд", callback_data='to_dishes'),
                 ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             cur_meal = Meal.objects.get(id=context.user_data["cur_dish_id"])
             text = ""
-            text += f"{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}\n{cur_meal.description}\n\n"
+            text += f"{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}\n{cur_meal.description}\n"
+            text += f"Калорийность - {cur_meal.get_caloric_value()} ккал\n\n"
             text += "Ингридиенты:\n"
             for ind, ingredient_quant in enumerate(cur_meal.ingredients_quant.all()):
                 text += f"\t\t{ind+1}. {ingredient_quant.ingredient.name} {ingredient_quant.quantity}{ingredient_quant.ingredient.uom}\n"
@@ -187,17 +182,76 @@ class Command(BaseCommand):
         def show_filters(update, context): pass
         def calculate_cost(update, context): pass
 
+        def send_invoice(update, context):
+            # token_pay = settings.token_pay # ЗАМЕНИЛ СТРОКУ
+            token_pay = os.getenv("PAYMENT_TOKEN")
+            print(token_pay)
+
+            chat_id = update.effective_message.chat_id
+            context.user_data['invoice_sent'] = True
+
+            keyboard = [
+                [InlineKeyboardButton('Оплатить', pay=True)],
+                # [InlineKeyboardButton('На главную', callback_data='to_start')],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.send_invoice(
+                chat_id=chat_id,
+                title="Оплата подписки",
+                description="Оплата подписки пользователя на 12 месяцев",
+                payload='payload',
+                provider_token=token_pay,
+                currency='RUB',
+                # need_phone_number=False,
+                # need_email=False,
+                is_flexible=False,
+                prices=[LabeledPrice(label='Оплата подписки', amount=20000)],
+                reply_markup=reply_markup,
+                start_parameter='test',
+            )
+            return 'SUCCESS_PAYMENT'
+
+        def process_pre_checkout_query(update, context):
+            query = update.pre_checkout_query
+            print(type(query))
+            try:
+                pass
+            except:
+                context.bot.answer_pre_checkout_query(
+                    pre_checkout_query_id=query.id,
+                    ok=False,
+                    error_message="Что-то пошло не так...",
+                )
+            else:
+                context.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
+
+        def success_payment(update, context):
+            '''Обработка успешной оплаты'''
+            amount = update.message.successful_payment.total_amount / 100
+            text = f'✅ Спасибо за оплату {amount} руб.!\n\n'
+            keyboard = [
+                [InlineKeyboardButton("На главную", callback_data="menu")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=telegram.ParseMode.HTML,
+            )
+
+            return 'SUCCESS_PAYMENT'
+
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', start_conversation)],
             states={
                 'GREETINGS': [
                     CallbackQueryHandler(menu, pattern='to_menu'),
-                    CallbackQueryHandler(paid, pattern='to_payment'),
+                    CallbackQueryHandler(send_invoice, pattern='to_payment'),
                 ],
                 'MAIN_MENU': [
                     CallbackQueryHandler(show_dishes, pattern='to_dishes'),
                     CallbackQueryHandler(show_filters, pattern='to_filters'),
-                    CallbackQueryHandler(paid, pattern='to_payment'),
+                    CallbackQueryHandler(send_invoice, pattern='to_payment'),
                 ],
                 'CUR_DISH': [
                     CallbackQueryHandler(prev_dish, pattern='prev_dish'),
@@ -206,13 +260,26 @@ class Command(BaseCommand):
                     CallbackQueryHandler(menu, pattern='menu'),
                 ],
                 'DISH_INFO': [
-                    CallbackQueryHandler(prev_dish, pattern='prev_dish'),
-                    CallbackQueryHandler(next_dish, pattern='next_dish'),
                     CallbackQueryHandler(calculate_cost, pattern='calculate_cost'),
-                    CallbackQueryHandler(menu, pattern='menu'),
+                    CallbackQueryHandler(show_dishes, pattern='to_dishes'),
+                ],
+                'SEND_INVOICE': [
+                    CallbackQueryHandler(send_invoice, pattern='pay'),
+                    # CallbackQueryHandler(make_order, pattern='cancel'),
+
+                ],
+                'PROCESS_PRE_CHECKOUT': [
+                    PreCheckoutQueryHandler(process_pre_checkout_query),
+                    CallbackQueryHandler(success_payment,
+                                         pattern='success_payment'),
+                ],
+                'SUCCESS_PAYMENT': [
+                    CallbackQueryHandler(start_conversation,
+                                         pattern='to_start'),
                 ],
             },
-            fallbacks=[CommandHandler('cancel', cancel)]
+            fallbacks=[CommandHandler('cancel', cancel)],
+            per_chat=False
         )
         cur_dish_id = 1
 

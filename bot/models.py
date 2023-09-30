@@ -88,7 +88,7 @@ class Meal(models.Model):
 
     def get_caloric_value(self):
         return sum(ingredient.get_caloric_value()
-                   for ingredient in self.ingredients_quant)
+                   for ingredient in self.ingredients_quant.all())
 
 
 class Settings(models.Model):
