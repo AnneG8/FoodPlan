@@ -83,6 +83,9 @@ class Command(BaseCommand):
                 [
                     InlineKeyboardButton("Выбрать блюдо", callback_data='to_dishes'),
                     InlineKeyboardButton("Настроить фильтр", callback_data='to_filters'),
+                ] if Client.objects.get(id_telegram=user_id).is_paid_up else
+                [
+                    InlineKeyboardButton("Выбрать блюдо", callback_data='to_dishes'),
                 ],
                 [
                     InlineKeyboardButton("Оплатить доступ", callback_data='to_payment')
@@ -115,6 +118,7 @@ class Command(BaseCommand):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             cur_meal = Meal.objects.get(id=context.user_data["cur_dish_id"])
+            print(cur_meal.name)
             update.effective_message.reply_photo(
                 photo=cur_meal.image,
                 caption=f"""{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}""",
@@ -138,21 +142,53 @@ class Command(BaseCommand):
                     InlineKeyboardButton("К выбору блюд", callback_data='to_dishes'),
                 ],
             ]
+            if Client.objects.get(id_telegram=user_id).is_paid_up: keyboard.insert(
+                0, [
+                    InlineKeyboardButton("❤", callback_data='like_dish'),
+                    InlineKeyboardButton("👎", callback_data='dislike_dish'),
+                   ],
+            )
             reply_markup = InlineKeyboardMarkup(keyboard)
             cur_meal = Meal.objects.get(id=context.user_data["cur_dish_id"])
             text = ""
-            text += f"{cur_meal.name}. Тип блюда - {cur_meal.type_of_meal.type_name}\n{cur_meal.description}\n"
-            text += f"Калорийность - {cur_meal.get_caloric_value()} ккал\n\n"
-            text += "Ингридиенты:\n"
+            text += f"""<b>{cur_meal.name}</b>. 
+<i>Тип блюда - {cur_meal.type_of_meal.type_name}</i>
+
+{cur_meal.description}
+
+Калорийность - {cur_meal.get_caloric_value()} ккал
+Ингредиенты:
+
+"""
             for ind, ingredient_quant in enumerate(cur_meal.ingredients_quant.all()):
-                text += f"\t\t{ind+1}. {ingredient_quant.ingredient.name} {ingredient_quant.quantity}{ingredient_quant.ingredient.uom}\n"
-            text += "\n\n"
+                text += f"{ind+1}. {ingredient_quant.ingredient.name} {ingredient_quant.quantity}{ingredient_quant.ingredient.uom}\n"
+            text += "\n"
             text += cur_meal.recipe
 
-            update.effective_message.reply_photo(
-                photo=cur_meal.image,
-                caption=text,
+            update.effective_message.reply_text(
+                #photo=cur_meal.image,
+                text=text,
                 reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return 'DISH_INFO'
+
+        def like_dish(update, context):
+            cur_dish = Meal.objects.get(id=cur_dish_id)
+            Client.objects.get(id_telegram=context.user_data["user_id"]).dislikes.remove(cur_dish)
+            Client.objects.get(id_telegram=context.user_data["user_id"]).likes.add(cur_dish)
+            update.effective_message.reply_text(
+                text=f"""Блюдо "{cur_dish.name}"добавлено в ❤ Избранное""",
+                parse_mode=ParseMode.HTML
+            )
+            return 'DISH_INFO'
+
+        def dislike_dish(update, context):
+            cur_dish = Meal.objects.get(id=cur_dish_id)
+            Client.objects.get(id_telegram=context.user_data["user_id"]).likes.remove(cur_dish)
+            Client.objects.get(id_telegram=context.user_data["user_id"]).dislikes.add(cur_dish)
+            update.effective_message.reply_text(
+                text=f"""Блюдо "{cur_dish.name}"добавлено в 👎 Черный список""",
                 parse_mode=ParseMode.HTML
             )
             return 'DISH_INFO'
@@ -163,7 +199,11 @@ class Command(BaseCommand):
                 if context.user_data["cur_dish_id"] < Meal.objects.all().count():
                     print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
                     context.user_data["cur_dish_id"] += 1
-                    print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
+                    for id in Meal.objects.all():
+                        print(id.name, id.id)
+                    if context.user_data["cur_dish_id"] == 7:
+                        context.user_data["cur_dish_id"] = 8
+                    #print(Meal.objects.get(id=context.user_data["cur_dish_id"]))
                     return show_dishes(update, context)
             else:
                 if context.user_data["cur_dish_id"] < 3:
@@ -183,62 +223,35 @@ class Command(BaseCommand):
         def calculate_cost(update, context): pass
 
         def send_invoice(update, context):
-            # token_pay = settings.token_pay # ЗАМЕНИЛ СТРОКУ
-            token_pay = os.getenv("PAYMENT_TOKEN")
-            print(token_pay)
-
-            chat_id = update.effective_message.chat_id
-            context.user_data['invoice_sent'] = True
-
             keyboard = [
-                [InlineKeyboardButton('Оплатить', pay=True)],
-                # [InlineKeyboardButton('На главную', callback_data='to_start')],
+                [
+                    InlineKeyboardButton("Подтвердить", callback_data='confirm'),
+                    InlineKeyboardButton("Назад", callback_data='to_menu'),
+                ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_invoice(
-                chat_id=chat_id,
-                title="Оплата подписки",
-                description="Оплата подписки пользователя на 12 месяцев",
-                payload='payload',
-                provider_token=token_pay,
-                currency='RUB',
-                # need_phone_number=False,
-                # need_email=False,
-                is_flexible=False,
-                prices=[LabeledPrice(label='Оплата подписки', amount=20000)],
+            update.effective_message.reply_text(
+                # photo=cur_meal.image,
+                text="Оплатить подписку на 1 месяц 500,00 RUB",
                 reply_markup=reply_markup,
-                start_parameter='test',
+                parse_mode=ParseMode.HTML
             )
-            return 'SUCCESS_PAYMENT'
-
-        def process_pre_checkout_query(update, context):
-            query = update.pre_checkout_query
-            print(type(query))
-            try:
-                pass
-            except:
-                context.bot.answer_pre_checkout_query(
-                    pre_checkout_query_id=query.id,
-                    ok=False,
-                    error_message="Что-то пошло не так...",
-                )
-            else:
-                context.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
-
-        def success_payment(update, context):
-            '''Обработка успешной оплаты'''
-            amount = update.message.successful_payment.total_amount / 100
-            text = f'✅ Спасибо за оплату {amount} руб.!\n\n'
+            return "SEND_INVOICE"
+        
+        def sucсess_pay(update, context):
             keyboard = [
-                [InlineKeyboardButton("На главную", callback_data="menu")],
+                [
+                    InlineKeyboardButton("В главное меню", callback_data='to_menu'),
+                ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            update.message.reply_text(
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode=telegram.ParseMode.HTML,
-            )
 
+            update.effective_message.reply_text(
+                # photo=cur_meal.image,
+                text="Подписка успшено оформлена✅",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
             return 'SUCCESS_PAYMENT'
 
         conv_handler = ConversationHandler(
@@ -260,23 +273,28 @@ class Command(BaseCommand):
                     CallbackQueryHandler(menu, pattern='menu'),
                 ],
                 'DISH_INFO': [
+                    CallbackQueryHandler(like_dish, pattern='like_dish'),
+                    CallbackQueryHandler(dislike_dish, pattern='dislike_dish'),
                     CallbackQueryHandler(calculate_cost, pattern='calculate_cost'),
                     CallbackQueryHandler(show_dishes, pattern='to_dishes'),
                 ],
                 'SEND_INVOICE': [
-                    CallbackQueryHandler(send_invoice, pattern='pay'),
+                    CallbackQueryHandler(sucсess_pay, pattern='confirm'),
+                    CallbackQueryHandler(menu, pattern='to_menu'),
                     # CallbackQueryHandler(make_order, pattern='cancel'),
-
-                ],
-                'PROCESS_PRE_CHECKOUT': [
-                    PreCheckoutQueryHandler(process_pre_checkout_query),
-                    CallbackQueryHandler(success_payment,
-                                         pattern='success_payment'),
                 ],
                 'SUCCESS_PAYMENT': [
-                    CallbackQueryHandler(start_conversation,
-                                         pattern='to_start'),
+                    CallbackQueryHandler(menu, pattern='to_menu'),
                 ],
+                # 'PROCESS_PRE_CHECKOUT': [
+                #     PreCheckoutQueryHandler(process_pre_checkout_query),
+                #     CallbackQueryHandler(success_payment,
+                #                          pattern='success_payment'),
+                # ],
+                # 'SUCCESS_PAYMENT': [
+                #     CallbackQueryHandler(start_conversation,
+                #                          pattern='to_start'),
+                # ],
             },
             fallbacks=[CommandHandler('cancel', cancel)],
             per_chat=False
