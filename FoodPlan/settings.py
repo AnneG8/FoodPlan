@@ -33,6 +33,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', [])
 
 SUBS_PRICE = env.float("SUBS_PRICE")
 
+TG_BOT_TOKEN = env.str('TG_BOT_TOKEN')
 
 # Application definition
 

@@ -1,9 +1,9 @@
 import datetime
 import telegram
-import os
 from pathlib import Path
 import sys
 from bot.models import *
+from FoodPlan.settings import TG_BOT_TOKEN
 from telegram import Update
 from django.core.management.base import BaseCommand
 from django.db.models import Q, Count
@@ -32,7 +32,7 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         load_dotenv()
 
-        tg_token = os.getenv("TG_BOT_TOKEN")
+        tg_token = TG_BOT_TOKEN
         updater = Updater(token=tg_token, use_context=True)
         dispatcher = updater.dispatcher
 
