@@ -31,7 +31,7 @@ DEBUG = env.bool('DEBUG', False)
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', [])
 
-SUBS_PRICE = env("SUBS_PRICE")
+SUBS_PRICE = env.float("SUBS_PRICE")
 
 
 # Application definition

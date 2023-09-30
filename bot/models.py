@@ -91,7 +91,6 @@ class Meal(models.Model):
     def get_caloric_value(self):
         return sum(ingredient.get_caloric_value()
                    for ingredient in self.ingredients_quant.all())
-    get_caloric_value.short_description = 'Калории'
 
 
 class Client(models.Model):
