@@ -82,6 +82,10 @@ class Command(BaseCommand):
             context.user_data['user_id'] = user_id
             context.user_data["cur_dish_id"] = 0
 
+            client = Client.objects.get(id_telegram=context.user_data["user_id"])
+            settings = Settings.objects.get_or_create(client=client)[0]
+            settings.save()
+
             if Client.objects.get(id_telegram=user_id).is_paid_up:
                 keyboard = [
                     [
@@ -127,7 +131,14 @@ class Command(BaseCommand):
                 ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            cur_meal = Meal.objects.all()[context.user_data["cur_dish_id"]]
+
+            client = Client.objects.get(id_telegram=context.user_data["user_id"])
+            print(client.settings.type_of_meal.all())
+            types_to_filter = list(client.settings.type_of_meal.all())
+            filtered_dishes = Meal.objects.filter(type_of_meal__in=types_to_filter)
+            context.user_data["filtered_dishes"] = filtered_dishes
+            cur_meal = filtered_dishes[context.user_data["cur_dish_id"]]
+
             print(cur_meal.name)
             update.effective_message.reply_photo(
                 photo=cur_meal.image,
@@ -159,7 +170,7 @@ class Command(BaseCommand):
                    ],
             )
             reply_markup = InlineKeyboardMarkup(keyboard)
-            cur_meal = Meal.objects.all()[context.user_data["cur_dish_id"]]
+            cur_meal = context.user_data["filtered_dishes"][context.user_data["cur_dish_id"]]
             text = ""
             text += f"""<b>{cur_meal.name}</b>. 
 <i>Тип блюда - {cur_meal.type_of_meal.type_name}</i>
@@ -206,11 +217,11 @@ class Command(BaseCommand):
         def next_dish(update, context):
             cur_client = Client.objects.get(id_telegram=context.user_data["user_id"])
             if cur_client.is_paid_up:
-                if context.user_data["cur_dish_id"] < Meal.objects.all().count()-1:
+                if context.user_data["cur_dish_id"] < context.user_data["filtered_dishes"].count()-1:
                     context.user_data["cur_dish_id"] += 1
                     return show_dishes(update, context)
             else:
-                if context.user_data["cur_dish_id"] < 3:
+                if context.user_data["cur_dish_id"] < 3 and context.user_data["cur_dish_id"] < context.user_data["filtered_dishes"].count()-1:
                     context.user_data["cur_dish_id"] += 1
                     return show_dishes(update, context)
 
@@ -221,7 +232,118 @@ class Command(BaseCommand):
                 print(Meal.objects.all()[context.user_data["cur_dish_id"]])
                 return show_dishes(update, context)
 
-        def show_filters(update, context): pass
+        def show_filters(update, context):
+            keyboard = [
+                [
+                    InlineKeyboardButton("По типу блюда", callback_data='filter_type'),
+                ],
+                [
+                    InlineKeyboardButton("По минимальной калорийности", callback_data='filter_minkal'),
+                ],
+                [
+                    InlineKeyboardButton("По максимальной калорийности", callback_data='filter_maxkal'),
+                ],
+                [
+                    InlineKeyboardButton("По ингредиенту", callback_data='filter_ingr'),
+                ],
+                [
+                    InlineKeyboardButton("Исключить ингредиент", callback_data='filter_rem_ingr'),
+                ],
+                [
+                    InlineKeyboardButton("Сбросить фильтры", callback_data='filter_reset'),
+                ],
+                [
+                    InlineKeyboardButton("Назад", callback_data='to_menu'),
+                ],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            update.effective_message.reply_text(
+                text="Настроить фильтр",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return "CHOOSE_FILTER"
+
+        def filter_type(update, context):
+            keyboard = []
+            for i in range(MealType.objects.all().count()):
+                keyboard.append([
+                    InlineKeyboardButton(MealType.objects.all()[i].type_name, callback_data=f'filter_type_ch{i+1}'),
+                ])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            update.effective_message.reply_text(
+                text="Фильтр по типу блюда",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return "FILTER_TYPE"
+
+        def filter_type_chd(update, context):
+            update.effective_message.reply_text(
+                text=f"""Блюда с типом '{MealType.objects.all()[context.user_data["ch_type"]].type_name}' удалены из фильтра""",
+                parse_mode=ParseMode.HTML
+            )
+            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.type_of_meal.remove(MealType.objects.all()[context.user_data["ch_type"]])
+            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.save()
+            print(Client.objects.get(id_telegram=context.user_data["user_id"]).settings.type_of_meal.all())
+            return show_filters(update, context)
+
+        def filter_type_ch_1(update, context):
+            context.user_data["ch_type"] = 0
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_2(update, context):
+            context.user_data["ch_type"] = 1
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_3(update, context):
+            context.user_data["ch_type"] = 2
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_4(update, context):
+            context.user_data["ch_type"] = 3
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_5(update, context):
+            context.user_data["ch_type"] = 4
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_6(update, context):
+            context.user_data["ch_type"] = 5
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_7(update, context):
+            context.user_data["ch_type"] = 6
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_8(update, context):
+            context.user_data["ch_type"] = 7
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_9(update, context):
+            context.user_data["ch_type"] = 8
+            return filter_type_chd(update, context)
+
+        def filter_type_ch_10(update, context):
+            context.user_data["ch_type"] = 9
+            return filter_type_chd(update, context)
+
+        def filter_reset(update, context):
+            settings = Client.objects.get(id_telegram=context.user_data["user_id"]).settings
+            settings.type_of_meal.set(MealType.objects.all())
+            settings.min_сalories = None
+            settings.max_сalories = None
+            settings.chosen_ingrs.set(Ingredient.objects.all())
+            settings.excluded_ingrs.set(Ingredient.objects.all())
+            settings.save()
+            update.effective_message.reply_text(
+                # photo=cur_meal.image,
+                text="Фильтры успешно сброшены✅",
+                parse_mode=ParseMode.HTML
+            )
+            return show_filters(update, context)
 
         def send_invoice(update, context):
             keyboard = [
@@ -238,7 +360,7 @@ class Command(BaseCommand):
                 parse_mode=ParseMode.HTML
             )
             return "SEND_INVOICE"
-        
+
         def success_pay(update, context):
             keyboard = [
                 [
@@ -249,6 +371,8 @@ class Command(BaseCommand):
             client = Client.objects.get(id_telegram=context.user_data["user_id"])
             client.is_paid_up = True
             client.save()
+            settings = Settings.objects.get_or_create(client=client)[0]
+            settings.save()
             update.effective_message.reply_text(
                 # photo=cur_meal.image,
                 text="Подписка успешно оформлена✅",
@@ -332,15 +456,27 @@ class Command(BaseCommand):
                 'SUCCESS_CANCEL_SUB': [
                     CallbackQueryHandler(menu, pattern='to_menu'),
                 ],
-                # 'PROCESS_PRE_CHECKOUT': [
-                #     PreCheckoutQueryHandler(process_pre_checkout_query),
-                #     CallbackQueryHandler(success_payment,
-                #                          pattern='success_payment'),
-                # ],
-                # 'SUCCESS_PAYMENT': [
-                #     CallbackQueryHandler(start_conversation,
-                #                          pattern='to_start'),
-                # ],
+                'CHOOSE_FILTER': [
+                    CallbackQueryHandler(filter_type, pattern='filter_type'),
+                    #CallbackQueryHandler(filter_minkal, pattern='filter_minkal'),
+                    #CallbackQueryHandler(filter_maxkal, pattern='filter_maxkal'),
+                    #CallbackQueryHandler(filter_ingr, pattern='filter_ingr'),
+                    #CallbackQueryHandler(filter_rem_ingr, pattern='filter_rem_ingr'),
+                    CallbackQueryHandler(filter_reset, pattern='filter_reset'),
+                    CallbackQueryHandler(menu, pattern='to_menu'),
+                ],
+                'FILTER_TYPE': [
+                    CallbackQueryHandler(filter_type_ch_1, pattern='filter_type_ch1'),
+                    CallbackQueryHandler(filter_type_ch_2, pattern='filter_type_ch2'),
+                    CallbackQueryHandler(filter_type_ch_3, pattern='filter_type_ch3'),
+                    CallbackQueryHandler(filter_type_ch_4, pattern='filter_type_ch4'),
+                    CallbackQueryHandler(filter_type_ch_5, pattern='filter_type_ch5'),
+                    CallbackQueryHandler(filter_type_ch_6, pattern='filter_type_ch6'),
+                    CallbackQueryHandler(filter_type_ch_7, pattern='filter_type_ch7'),
+                    CallbackQueryHandler(filter_type_ch_8, pattern='filter_type_ch8'),
+                    CallbackQueryHandler(filter_type_ch_9, pattern='filter_type_ch9'),
+                    CallbackQueryHandler(filter_type_ch_10, pattern='filter_type_ch10'),
+                ],
             },
             fallbacks=[CommandHandler('cancel', cancel)],
             per_chat=False

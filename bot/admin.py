@@ -1,6 +1,6 @@
 from django.contrib import admin
 from bot.models import (Ingredient, MealType, Meal, Client, 
-                        IngredientQuantity, Revenue)
+                        IngredientQuantity, Revenue, Settings)
 
 
 class IngredientQuantityInline(admin.TabularInline):
@@ -41,3 +41,4 @@ class RevenueAdmin(admin.ModelAdmin):
 
 
 admin.site.register(MealType)
+admin.site.register(Settings)
