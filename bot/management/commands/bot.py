@@ -81,6 +81,7 @@ class Command(BaseCommand):
             context.user_data['user_first_name'] = user_first_name
             context.user_data['user_id'] = user_id
             context.user_data["cur_dish_id"] = 0
+            context.user_data["is_showing_likes"] = False
 
             client = Client.objects.get(id_telegram=context.user_data["user_id"])
             settings = Settings.objects.get_or_create(client=client)[0]
@@ -93,6 +94,7 @@ class Command(BaseCommand):
                         InlineKeyboardButton("Настроить фильтр", callback_data='to_filters'),
                     ],
                     [
+                        InlineKeyboardButton("Избранное", callback_data='liked'),
                         InlineKeyboardButton("Отменить подписку", callback_data='cancel_sub')
                     ]
                 ]
@@ -156,6 +158,16 @@ class Command(BaseCommand):
             else:
                 filtered_dishes = Meal.objects.all()
 
+            dishes_ids = [i.id for i in client.dislikes.all()]
+            print(dishes_ids)
+            print(filtered_dishes.all())
+            filtered_dishes = filtered_dishes.exclude(id__in=dishes_ids)
+            print(filtered_dishes.all())
+
+            if context.user_data["is_showing_likes"]:
+                dishes_ids = [i.id for i in client.likes.all()]
+                filtered_dishes = filtered_dishes.filter(id__in=dishes_ids)
+
             context.user_data["filtered_dishes"] = filtered_dishes
             if filtered_dishes.count() > 0:
                 cur_meal = filtered_dishes[context.user_data["cur_dish_id"]]
@@ -167,12 +179,16 @@ class Command(BaseCommand):
                 return 'MAIN_MENU'
 
             print(cur_meal.name)
-            update.effective_message.reply_photo(
-                photo=cur_meal.image,
-                caption=f"""<b>{cur_meal.name}</b>.
+            text = ""
+            if cur_meal in list(client.likes.all()):
+                text += "❤ "
+            text += f"""<b>{cur_meal.name}</b>.
 <i>Калорийность - {cur_meal.get_caloric_value()} ккал</i>
 
-{cur_meal.description}""",
+{cur_meal.description}"""
+            update.effective_message.reply_photo(
+                photo=cur_meal.image,
+                caption=text,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
@@ -199,6 +215,8 @@ class Command(BaseCommand):
             reply_markup = InlineKeyboardMarkup(keyboard)
             cur_meal = context.user_data["filtered_dishes"][context.user_data["cur_dish_id"]]
             text = ""
+            if context.user_data["is_showing_likes"]:
+                text += "❤ "
             text += f"""<b>{cur_meal.name}</b>. 
 <i>Тип блюда - {cur_meal.type_of_meal.type_name}</i>
 
@@ -220,25 +238,29 @@ class Command(BaseCommand):
             )
             return 'DISH_INFO'
 
+        def show_likes(update, context):
+            context.user_data["is_showing_likes"] = True
+            return show_dishes(update, context)
+
         def like_dish(update, context):
-            cur_dish = Meal.objects.all()[context.user_data["cur_dish_id"]]
+            cur_dish = context.user_data["filtered_dishes"][context.user_data["cur_dish_id"]]
             Client.objects.get(id_telegram=context.user_data["user_id"]).dislikes.remove(cur_dish)
             Client.objects.get(id_telegram=context.user_data["user_id"]).likes.add(cur_dish)
             update.effective_message.reply_text(
                 text=f"""Блюдо "{cur_dish.name}"добавлено в ❤ Избранное""",
                 parse_mode=ParseMode.HTML
             )
-            return 'DISH_INFO'
+            return cur_dish_info(update, context)
 
         def dislike_dish(update, context):
-            cur_dish = Meal.objects.all()[context.user_data["cur_dish_id"]]
+            cur_dish = context.user_data["filtered_dishes"][context.user_data["cur_dish_id"]]
             Client.objects.get(id_telegram=context.user_data["user_id"]).likes.remove(cur_dish)
             Client.objects.get(id_telegram=context.user_data["user_id"]).dislikes.add(cur_dish)
             update.effective_message.reply_text(
                 text=f"""Блюдо "{cur_dish.name}"добавлено в 👎 Черный список""",
                 parse_mode=ParseMode.HTML
             )
-            return 'DISH_INFO'
+            return cur_dish_info(update, context)
 
         def next_dish(update, context):
             cur_client = Client.objects.get(id_telegram=context.user_data["user_id"])
@@ -605,6 +627,7 @@ class Command(BaseCommand):
                 'MAIN_MENU': [
                     CallbackQueryHandler(show_dishes, pattern='to_dishes'),
                     CallbackQueryHandler(show_filters, pattern='to_filters'),
+                    CallbackQueryHandler(show_likes, pattern='liked'),
                     CallbackQueryHandler(send_invoice, pattern='to_payment'),
                     CallbackQueryHandler(cancel_sub, pattern='cancel_sub'),
                 ],
