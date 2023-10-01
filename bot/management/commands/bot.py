@@ -1,10 +1,11 @@
 import datetime
 import telegram
-from pathlib import Path
-import sys
+import os
+# from pathlib import Path
+# import sys
 from bot.models import *
 from FoodPlan.settings import TG_BOT_TOKEN, STATIC_ROOT
-from telegram import Update
+# from telegram import Update
 from django.core.management.base import BaseCommand
 from django.db.models import Q, Count
 from dotenv import load_dotenv
@@ -64,12 +65,14 @@ class Command(BaseCommand):
                 ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            update.effective_message.reply_photo(
-                photo=open('C:/Users/Honor/Documents/GitHub/FoodPlan/media/greetings.jpg', 'rb'),
-                caption=f"""<b>Шефом может стать каждый!\nПоможем быстро и легко приготовить блюдо дня!</b>""",
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML
-            )
+            filepath = os.path.join(STATIC_ROOT, 'greetings.jpg')
+            with open(filepath, 'rb') as file:
+                update.effective_message.reply_photo(
+                    photo=file,
+                    caption=f"""<b>Шефом может стать каждый!\nПоможем быстро и легко приготовить блюдо дня!</b>""",
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
             for meal in Meal.objects.all():
                 print(meal.id)
             return 'GREETINGS'
@@ -107,12 +110,14 @@ class Command(BaseCommand):
                 ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            update.effective_message.reply_photo(
-                photo=open("C:/Users/Honor/Documents/GitHub/FoodPlan/media/img.png", "rb"),
-                caption=f"""Основное меню""",
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML
-            )
+            filepath = os.path.join(STATIC_ROOT, 'img.png')
+            with open(filepath, 'rb') as file:
+                update.effective_message.reply_photo(
+                    photo=file,
+                    caption=f"""Основное меню""",
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
             return 'MAIN_MENU'
 
         def show_dishes(update, context):
