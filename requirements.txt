@@ -3,3 +3,5 @@ Pillow==10.0.1
 environs==9.5.0
 pytz==2023.3.post1
 schedule==1.2.0
+telegram==13.12
+python-dotenv~=1.0.0
