@@ -59,7 +59,7 @@ class Command(BaseCommand):
                     InlineKeyboardButton("Оплатить подписку", callback_data='to_payment'),
                 ] if not Client.objects.get(id_telegram=user_id).is_paid_up else
                 [
-                    InlineKeyboardButton("Попробовать бесплатно", callback_data='to_menu'),
+                    InlineKeyboardButton("В главное меню", callback_data='to_menu'),
                     InlineKeyboardButton("Отменить подписку", callback_data='cancel_sub')
                 ],
             ]
@@ -134,10 +134,37 @@ class Command(BaseCommand):
 
             client = Client.objects.get(id_telegram=context.user_data["user_id"])
             print(client.settings.type_of_meal.all())
+
             types_to_filter = list(client.settings.type_of_meal.all())
-            filtered_dishes = Meal.objects.filter(type_of_meal__in=types_to_filter)
+            if types_to_filter:
+                filtered_dishes = Meal.objects.filter(type_of_meal__in=types_to_filter)
+            else:
+                filtered_dishes = Meal.objects.all()
+
+            if client.settings.min_сalories:
+                for meal in filtered_dishes:
+                    if meal.get_caloric_value() < client.settings.min_сalories:
+                        filtered_dishes = filtered_dishes.exclude(id__in=[meal.id])
+            if client.settings.max_сalories:
+                for meal in filtered_dishes:
+                    if meal.get_caloric_value() > client.settings.max_сalories:
+                        filtered_dishes = filtered_dishes.exclude(id__in=[meal.id])
+
+            ingrs_to_filter = list(client.settings.chosen_ingrs.all())
+            if ingrs_to_filter:
+                filtered_dishes = Meal.objects.filter(ingredients_quant__ingredient__in=ingrs_to_filter)
+            else:
+                filtered_dishes = Meal.objects.all()
+
             context.user_data["filtered_dishes"] = filtered_dishes
-            cur_meal = filtered_dishes[context.user_data["cur_dish_id"]]
+            if filtered_dishes.count() > 0:
+                cur_meal = filtered_dishes[context.user_data["cur_dish_id"]]
+            else:
+                update.effective_message.reply_text(
+                    text="Блюд по таким фильтрам не найдено",
+                    parse_mode=ParseMode.HTML
+                )
+                return 'MAIN_MENU'
 
             print(cur_meal.name)
             update.effective_message.reply_photo(
@@ -187,7 +214,6 @@ class Command(BaseCommand):
             text += cur_meal.recipe
 
             update.effective_message.reply_text(
-                #photo=cur_meal.image,
                 text=text,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
@@ -227,9 +253,7 @@ class Command(BaseCommand):
 
         def prev_dish(update, context):
             if context.user_data["cur_dish_id"] >= 1:
-                print(Meal.objects.all()[context.user_data["cur_dish_id"]])
                 context.user_data["cur_dish_id"] -= 1
-                print(Meal.objects.all()[context.user_data["cur_dish_id"]])
                 return show_dishes(update, context)
 
         def show_filters(update, context):
@@ -282,10 +306,10 @@ class Command(BaseCommand):
 
         def filter_type_chd(update, context):
             update.effective_message.reply_text(
-                text=f"""Блюда с типом '{MealType.objects.all()[context.user_data["ch_type"]].type_name}' удалены из фильтра""",
+                text=f"""Блюда отфильтрованы по типу '{MealType.objects.all()[context.user_data["ch_type"]].type_name}'""",
                 parse_mode=ParseMode.HTML
             )
-            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.type_of_meal.remove(MealType.objects.all()[context.user_data["ch_type"]])
+            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.type_of_meal.add(MealType.objects.all()[context.user_data["ch_type"]])
             Client.objects.get(id_telegram=context.user_data["user_id"]).settings.save()
             print(Client.objects.get(id_telegram=context.user_data["user_id"]).settings.type_of_meal.all())
             return show_filters(update, context)
@@ -330,16 +354,171 @@ class Command(BaseCommand):
             context.user_data["ch_type"] = 9
             return filter_type_chd(update, context)
 
-        def filter_reset(update, context):
-            settings = Client.objects.get(id_telegram=context.user_data["user_id"]).settings
-            settings.type_of_meal.set(MealType.objects.all())
-            settings.min_сalories = None
-            settings.max_сalories = None
-            settings.chosen_ingrs.set(Ingredient.objects.all())
-            settings.excluded_ingrs.set(Ingredient.objects.all())
-            settings.save()
+        def filter_ingr(update, context):
+            keyboard = [
+                [
+                    InlineKeyboardButton("Назад", callback_data='to_filters'),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
             update.effective_message.reply_text(
                 # photo=cur_meal.image,
+                reply_markup=reply_markup,
+                text="Введите ингредиент, который должен быть в блюде",
+                parse_mode=ParseMode.HTML
+            )
+            return 'FILTER_INGR'
+
+        def choose_ingr(update, context):
+            keyboard = []
+            find_ingrs = Ingredient.objects.filter(name__contains=update.message.text.lower())
+            for i in range(find_ingrs.count()):
+                keyboard.append([
+                    InlineKeyboardButton(find_ingrs[i].name, callback_data=f'filter_ingr_ch{i+1}'),
+                ])
+            keyboard.append([InlineKeyboardButton("Уточнить поиск", callback_data='filter_ingr')])
+            keyboard.append([InlineKeyboardButton("Назад", callback_data='to_filters')])
+            if find_ingrs.count() == 0:
+                keyboard = [
+                    [InlineKeyboardButton("Уточнить поиск", callback_data='filter_ingr')],
+                    [InlineKeyboardButton("Назад", callback_data='to_filters')]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                update.effective_message.reply_text(
+                    text="Таких ингредиентов не найдено. Уточните название",
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+                return "FILTER_INGR_CH"
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            update.effective_message.reply_text(
+                text="Фильтр по содержанию ингредиенту",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            context.user_data["finded_ingrs"] = find_ingrs
+            return "FILTER_INGR_CH"
+
+        def filter_ingr_chd(update, context):
+            update.effective_message.reply_text(
+                text=f"""Блюда отфильтрованы по ингредиенту '{context.user_data["finded_ingrs"][context.user_data["ch_ingr"]].name}'""",
+                parse_mode=ParseMode.HTML
+            )
+            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.chosen_ingrs.add(context.user_data["finded_ingrs"][context.user_data["ch_ingr"]])
+            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.save()
+            print(Client.objects.get(id_telegram=context.user_data["user_id"]).settings.chosen_ingrs.all())
+            return show_filters(update, context)
+
+        def filter_ingr_ch_1(update, context):
+            context.user_data["ch_ingr"] = 0
+            return filter_ingr_chd(update, context)
+
+        def filter_ingr_ch_2(update, context):
+            context.user_data["ch_ingr"] = 1
+            return filter_ingr_chd(update, context)
+
+        def filter_ingr_ch_3(update, context):
+            context.user_data["ch_ingr"] = 2
+            return filter_ingr_chd(update, context)
+
+        def filter_ingr_ch_4(update, context):
+            context.user_data["ch_ingr"] = 3
+            return filter_ingr_chd(update, context)
+
+        def filter_ingr_ch_5(update, context):
+            context.user_data["ch_ingr"] = 4
+            return filter_ingr_chd(update, context)
+
+        def filter_minkal(update, context):
+            keyboard = [
+                [
+                    InlineKeyboardButton("Назад", callback_data='to_filters'),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.effective_message.reply_text(
+                # photo=cur_meal.image,
+                reply_markup=reply_markup,
+                text="Введите минимальное количество калорий",
+                parse_mode=ParseMode.HTML
+            )
+            return 'FILTER_MINKAL'
+
+        def choose_minkal(update, context):
+            try:
+                minkal = int(update.message.text)
+            except ValueError:
+                keyboard = [
+                    [
+                        InlineKeyboardButton("Назад", callback_data='to_filters'),
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                update.effective_message.reply_text(
+                    reply_markup=reply_markup,
+                    text="Введите целое число",
+                    parse_mode=ParseMode.HTML
+                )
+                return 'FILTER_MINKAL'
+            settings = Client.objects.get(id_telegram=context.user_data["user_id"]).settings
+            settings.min_сalories = minkal
+            settings.save()
+            update.effective_message.reply_text(
+                text="Фильтр применен",
+                parse_mode=ParseMode.HTML
+            )
+            return show_filters(update, context)
+
+        def filter_maxkal(update, context):
+            keyboard = [
+                [
+                    InlineKeyboardButton("Назад", callback_data='to_filters'),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.effective_message.reply_text(
+                # photo=cur_meal.image,
+                reply_markup=reply_markup,
+                text="Введите максимальное количество калорий",
+                parse_mode=ParseMode.HTML
+            )
+            return 'FILTER_MAXKAL'
+
+        def choose_maxkal(update, context):
+            try:
+                maxkal = int(update.message.text)
+            except ValueError:
+                keyboard = [
+                    [
+                        InlineKeyboardButton("Назад", callback_data='to_filters'),
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                update.effective_message.reply_text(
+                    reply_markup=reply_markup,
+                    text="Введите целое число",
+                    parse_mode=ParseMode.HTML
+                )
+                return 'FILTER_MAXKAL'
+            settings = Client.objects.get(id_telegram=context.user_data["user_id"]).settings
+            settings.max_сalories = maxkal
+            settings.save()
+            update.effective_message.reply_text(
+                text="Фильтр применен",
+                parse_mode=ParseMode.HTML
+            )
+            return show_filters(update, context)
+
+        def filter_reset(update, context):
+            settings = Client.objects.get(id_telegram=context.user_data["user_id"]).settings
+            settings.type_of_meal.clear()
+            settings.min_сalories = None
+            settings.max_сalories = None
+            settings.chosen_ingrs.clear()
+            settings.excluded_ingrs.clear()
+            settings.save()
+            update.effective_message.reply_text(
                 text="Фильтры успешно сброшены✅",
                 parse_mode=ParseMode.HTML
             )
@@ -458,9 +637,9 @@ class Command(BaseCommand):
                 ],
                 'CHOOSE_FILTER': [
                     CallbackQueryHandler(filter_type, pattern='filter_type'),
-                    #CallbackQueryHandler(filter_minkal, pattern='filter_minkal'),
-                    #CallbackQueryHandler(filter_maxkal, pattern='filter_maxkal'),
-                    #CallbackQueryHandler(filter_ingr, pattern='filter_ingr'),
+                    CallbackQueryHandler(filter_minkal, pattern='filter_minkal'),
+                    CallbackQueryHandler(filter_maxkal, pattern='filter_maxkal'),
+                    CallbackQueryHandler(filter_ingr, pattern='filter_ingr'),
                     #CallbackQueryHandler(filter_rem_ingr, pattern='filter_rem_ingr'),
                     CallbackQueryHandler(filter_reset, pattern='filter_reset'),
                     CallbackQueryHandler(menu, pattern='to_menu'),
@@ -477,6 +656,27 @@ class Command(BaseCommand):
                     CallbackQueryHandler(filter_type_ch_9, pattern='filter_type_ch9'),
                     CallbackQueryHandler(filter_type_ch_10, pattern='filter_type_ch10'),
                 ],
+                'FILTER_INGR': [
+                    CallbackQueryHandler(show_filters, pattern='to_filters'),
+                    MessageHandler(Filters.text & ~Filters.command, choose_ingr),
+                ],
+                'FILTER_INGR_CH': [
+                    CallbackQueryHandler(filter_ingr_ch_1, pattern='filter_ingr_ch1'),
+                    CallbackQueryHandler(filter_ingr_ch_2, pattern='filter_ingr_ch2'),
+                    CallbackQueryHandler(filter_ingr_ch_3, pattern='filter_ingr_ch3'),
+                    CallbackQueryHandler(filter_ingr_ch_4, pattern='filter_ingr_ch4'),
+                    CallbackQueryHandler(filter_ingr_ch_5, pattern='filter_ingr_ch5'),
+                    CallbackQueryHandler(filter_ingr, pattern='filter_ingr'),
+                    CallbackQueryHandler(show_filters, pattern='to_filters'),
+                ],
+                'FILTER_MINKAL': [
+                    CallbackQueryHandler(show_filters, pattern='to_filters'),
+                    MessageHandler(Filters.text & ~Filters.command, choose_minkal),
+                ],
+                'FILTER_MAXKAL': [
+                    CallbackQueryHandler(show_filters, pattern='to_filters'),
+                    MessageHandler(Filters.text & ~Filters.command, choose_maxkal),
+                ]
             },
             fallbacks=[CommandHandler('cancel', cancel)],
             per_chat=False
