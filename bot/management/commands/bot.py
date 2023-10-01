@@ -155,18 +155,20 @@ class Command(BaseCommand):
             ingrs_to_filter = list(client.settings.chosen_ingrs.all())
             if ingrs_to_filter:
                 filtered_dishes = Meal.objects.filter(ingredients_quant__ingredient__in=ingrs_to_filter)
-            else:
-                filtered_dishes = Meal.objects.all()
+
+            ingrs_to_filter = list(client.settings.excluded_ingrs.all())
+            if ingrs_to_filter:
+                filtered_dishes = Meal.objects.exclude(ingredients_quant__ingredient__in=ingrs_to_filter)
+
+            if context.user_data["is_showing_likes"]:
+                dishes_ids = [i.id for i in client.likes.all()]
+                filtered_dishes = filtered_dishes.filter(id__in=dishes_ids)
 
             dishes_ids = [i.id for i in client.dislikes.all()]
             print(dishes_ids)
             print(filtered_dishes.all())
             filtered_dishes = filtered_dishes.exclude(id__in=dishes_ids)
             print(filtered_dishes.all())
-
-            if context.user_data["is_showing_likes"]:
-                dishes_ids = [i.id for i in client.likes.all()]
-                filtered_dishes = filtered_dishes.filter(id__in=dishes_ids)
 
             context.user_data["filtered_dishes"] = filtered_dishes
             if filtered_dishes.count() > 0:
@@ -452,6 +454,82 @@ class Command(BaseCommand):
             context.user_data["ch_ingr"] = 4
             return filter_ingr_chd(update, context)
 
+        def filter_rem_ingr(update, context):
+            keyboard = [
+                [
+                    InlineKeyboardButton("Назад", callback_data='to_filters'),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.effective_message.reply_text(
+                # photo=cur_meal.image,
+                reply_markup=reply_markup,
+                text="Введите ингредиент, которого не должно быть в блюде",
+                parse_mode=ParseMode.HTML
+            )
+            return 'FILTER_REM_INGR'
+
+        def choose_rem_ingr(update, context):
+            keyboard = []
+            find_ingrs = Ingredient.objects.filter(name__contains=update.message.text.lower())
+            for i in range(find_ingrs.count()):
+                keyboard.append([
+                    InlineKeyboardButton(find_ingrs[i].name, callback_data=f'filter_rem_ingr_ch{i+1}'),
+                ])
+            keyboard.append([InlineKeyboardButton("Уточнить поиск", callback_data='filter_rem_ingr')])
+            keyboard.append([InlineKeyboardButton("Назад", callback_data='to_filters')])
+            if find_ingrs.count() == 0:
+                keyboard = [
+                    [InlineKeyboardButton("Уточнить поиск", callback_data='filter_rem_ingr')],
+                    [InlineKeyboardButton("Назад", callback_data='to_filters')]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                update.effective_message.reply_text(
+                    text="Таких ингредиентов не найдено. Уточните название",
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+                return "FILTER_REM_INGR_CH"
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            update.effective_message.reply_text(
+                text="Фильтр по содержанию ингредиенту",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            context.user_data["finded_ingrs"] = find_ingrs
+            return "FILTER_REM_INGR_CH"
+
+        def filter_rem_ingr_chd(update, context):
+            update.effective_message.reply_text(
+                text=f"""Блюда с ингредиентом '{context.user_data["finded_ingrs"][context.user_data["ch_ingr"]].name}' успешно удалены""",
+                parse_mode=ParseMode.HTML
+            )
+            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.excluded_ingrs.add(context.user_data["finded_ingrs"][context.user_data["ch_ingr"]])
+            Client.objects.get(id_telegram=context.user_data["user_id"]).settings.save()
+            print(Client.objects.get(id_telegram=context.user_data["user_id"]).settings.excluded_ingrs.all())
+            return show_filters(update, context)
+
+        def filter_rem_ingr_ch_1(update, context):
+            context.user_data["ch_ingr"] = 0
+            return filter_rem_ingr_chd(update, context)
+
+        def filter_rem_ingr_ch_2(update, context):
+            context.user_data["ch_ingr"] = 1
+            return filter_rem_ingr_chd(update, context)
+
+        def filter_rem_ingr_ch_3(update, context):
+            context.user_data["ch_ingr"] = 2
+            return filter_rem_ingr_chd(update, context)
+
+        def filter_rem_ingr_ch_4(update, context):
+            context.user_data["ch_ingr"] = 3
+            return filter_rem_ingr_chd(update, context)
+
+        def filter_rem_ingr_ch_5(update, context):
+            context.user_data["ch_ingr"] = 4
+            return filter_rem_ingr_chd(update, context)
+
         def filter_minkal(update, context):
             keyboard = [
                 [
@@ -663,7 +741,7 @@ class Command(BaseCommand):
                     CallbackQueryHandler(filter_minkal, pattern='filter_minkal'),
                     CallbackQueryHandler(filter_maxkal, pattern='filter_maxkal'),
                     CallbackQueryHandler(filter_ingr, pattern='filter_ingr'),
-                    #CallbackQueryHandler(filter_rem_ingr, pattern='filter_rem_ingr'),
+                    CallbackQueryHandler(filter_rem_ingr, pattern='filter_rem_ingr'),
                     CallbackQueryHandler(filter_reset, pattern='filter_reset'),
                     CallbackQueryHandler(menu, pattern='to_menu'),
                 ],
@@ -690,6 +768,19 @@ class Command(BaseCommand):
                     CallbackQueryHandler(filter_ingr_ch_4, pattern='filter_ingr_ch4'),
                     CallbackQueryHandler(filter_ingr_ch_5, pattern='filter_ingr_ch5'),
                     CallbackQueryHandler(filter_ingr, pattern='filter_ingr'),
+                    CallbackQueryHandler(show_filters, pattern='to_filters'),
+                ],
+                'FILTER_REM_INGR': [
+                    CallbackQueryHandler(show_filters, pattern='to_filters'),
+                    MessageHandler(Filters.text & ~Filters.command, choose_rem_ingr),
+                ],
+                'FILTER_REM_INGR_CH': [
+                    CallbackQueryHandler(filter_rem_ingr_ch_1, pattern='filter_rem_ingr_ch1'),
+                    CallbackQueryHandler(filter_rem_ingr_ch_2, pattern='filter_rem_ingr_ch2'),
+                    CallbackQueryHandler(filter_rem_ingr_ch_3, pattern='filter_rem_ingr_ch3'),
+                    CallbackQueryHandler(filter_rem_ingr_ch_4, pattern='filter_rem_ingr_ch4'),
+                    CallbackQueryHandler(filter_rem_ingr_ch_5, pattern='filter_rem_ingr_ch5'),
+                    CallbackQueryHandler(filter_rem_ingr, pattern='filter_rem_ingr'),
                     CallbackQueryHandler(show_filters, pattern='to_filters'),
                 ],
                 'FILTER_MINKAL': [
