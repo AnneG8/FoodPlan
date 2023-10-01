@@ -3,7 +3,7 @@ import telegram
 from pathlib import Path
 import sys
 from bot.models import *
-from FoodPlan.settings import TG_BOT_TOKEN
+from FoodPlan.settings import TG_BOT_TOKEN, STATIC_ROOT
 from telegram import Update
 from django.core.management.base import BaseCommand
 from django.db.models import Q, Count
