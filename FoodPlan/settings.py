@@ -31,8 +31,12 @@ DEBUG = env.bool('DEBUG', False)
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', [])
 
+SUBS_PRICE = env.float("SUBS_PRICE")
+
+TG_BOT_TOKEN = env.str('TG_BOT_TOKEN')
 
 # Application definition
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -121,6 +125,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATIC_ROOT = 'static/'
+
+MEDIA_ROOT = f'{BASE_DIR}/media/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

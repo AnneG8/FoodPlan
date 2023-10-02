@@ -26,6 +26,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 .vscode
+.idea/
+media/
+staticfiles/
 
 
 # PyInstaller
@@ -138,5 +141,4 @@ dmypy.json
 cython_debug/
 .idea/
 
-# bot/migrations/*
 media/
