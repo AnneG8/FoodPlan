@@ -14,3 +14,8 @@ def get_new_payment_date(curr_date: date = date.today()) -> date:
 	return curr_date + timedelta(days=days_in_month)
 
 
+def get_new_dish_id(last_id: int, max_set_id: int, direction):
+    if(direction == 'next'):
+        return last_id + 1 if max_set_id != last_id else 0
+    else:
+        return last_id - 1 if last_id != 0 else max_set_id

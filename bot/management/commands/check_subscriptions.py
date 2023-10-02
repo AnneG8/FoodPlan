@@ -38,6 +38,9 @@ def check_subscriptions():
 class Command(BaseCommand):
     help = 'проверка наличия подписок'
 
+    if not Revenue.objects.all():
+        Revenue.objects.create()
+
     schedule.every().day.at('00:00', 'Europe/Moscow').do(check_subscriptions)
     while True:
         schedule.run_pending()

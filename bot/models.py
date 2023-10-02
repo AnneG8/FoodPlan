@@ -75,7 +75,6 @@ class Meal(models.Model):
         related_name='meals',
         on_delete=models.CASCADE
     )
-    # ingredients_quant
     recipe = models.TextField('Рецепт')
     is_recommended = models.BooleanField('Рекомендуемое', default=False)
     # кол-во порций
@@ -182,8 +181,11 @@ class Revenue(models.Model):
         'Месяц',
         default=date.today().replace(day=1)
     )
-    revenue_sum = models.IntegerField('Выручки за месяц', default=0)
+    revenue_sum = models.IntegerField('Выручка за месяц', default=0)
 
     class Meta:
         verbose_name = 'Выручка за месяц'
         verbose_name_plural = 'Выручка'
+
+    def __str__(self):
+        return self.month.strftime("%B, %Y")

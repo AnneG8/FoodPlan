@@ -1,14 +1,7 @@
-import datetime
 import telegram
 import os
-# from pathlib import Path
-# import sys
-from bot.models import *
-from FoodPlan.settings import TG_BOT_TOKEN, STATIC_ROOT
-# from telegram import Update
+from datetime import date
 from django.core.management.base import BaseCommand
-from django.db.models import Q, Count
-from dotenv import load_dotenv
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -27,11 +20,13 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
     ConversationHandler
 )
+from bot.views import get_new_payment_date, get_new_dish_id
+from FoodPlan.settings import TG_BOT_TOKEN, STATIC_ROOT, SUBS_PRICE
+from bot.models import *
 
 
 class Command(BaseCommand):
     def handle(self, *args, **kwargs):
-        load_dotenv()
 
         tg_token = TG_BOT_TOKEN
         updater = Updater(token=tg_token, use_context=True)
@@ -50,15 +45,14 @@ class Command(BaseCommand):
             if not Client.objects.filter(id_telegram=user_id).exists():
                 Client.objects.create(
                     id_telegram=user_id,
-                    name=user_first_name,
-                    is_paid_up=False
+                    name=user_first_name
                 )
 
             keyboard = [
                 [
                     InlineKeyboardButton("Попробовать бесплатно", callback_data='to_menu'),
                     InlineKeyboardButton("Оплатить подписку", callback_data='to_payment'),
-                ] if not Client.objects.get(id_telegram=user_id).is_paid_up else
+                ] if not Client.objects.get(id_telegram=user_id).renew_sub else
                 [
                     InlineKeyboardButton("В главное меню", callback_data='to_menu'),
                     InlineKeyboardButton("Отменить подписку", callback_data='cancel_sub')
@@ -73,8 +67,6 @@ class Command(BaseCommand):
                     reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML
                 )
-            for meal in Meal.objects.all():
-                print(meal.id)
             return 'GREETINGS'
 
         def menu(update, context):
@@ -84,20 +76,27 @@ class Command(BaseCommand):
             context.user_data['user_first_name'] = user_first_name
             context.user_data['user_id'] = user_id
             context.user_data["cur_dish_id"] = 0
-            context.user_data["is_showing_likes"] = False
 
-            client = Client.objects.get(id_telegram=context.user_data["user_id"])
+            context.user_data["is_showing_likes"] = False
+            context.user_data["is_showing_dislikes"] = False
+
+            client = Client.objects.get(id_telegram=user_id)
             settings = Settings.objects.get_or_create(client=client)[0]
             settings.save()
 
-            if Client.objects.get(id_telegram=user_id).is_paid_up:
+            if client.is_paid_up:
                 keyboard = [
                     [
                         InlineKeyboardButton("Выбрать блюдо", callback_data='to_dishes'),
-                        InlineKeyboardButton("Настроить фильтр", callback_data='to_filters'),
                     ],
                     [
                         InlineKeyboardButton("Избранное", callback_data='liked'),
+                        InlineKeyboardButton("Черный список", callback_data='disliked')
+                    ],
+                    [
+                        InlineKeyboardButton("Настроить фильтр", callback_data='to_filters'),
+                        InlineKeyboardButton("Оплатить подписку", callback_data='to_payment')
+                        if not Client.objects.get(id_telegram=user_id).renew_sub else
                         InlineKeyboardButton("Отменить подписку", callback_data='cancel_sub')
                     ]
                 ]
@@ -134,62 +133,58 @@ class Command(BaseCommand):
                     InlineKeyboardButton(">>", callback_data='next_dish'),
                 ],
                 [
-                    InlineKeyboardButton("В главное меню", callback_data='menu'),
+                    InlineKeyboardButton("В главное меню", callback_data='to_menu'),
                 ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             client = Client.objects.get(id_telegram=context.user_data["user_id"])
-            print(client.settings.type_of_meal.all())
-
-            types_to_filter = list(client.settings.type_of_meal.all())
-            if types_to_filter:
-                filtered_dishes = Meal.objects.filter(type_of_meal__in=types_to_filter)
-            else:
-                filtered_dishes = Meal.objects.all()
-
-            if client.settings.min_сalories:
-                for meal in filtered_dishes:
-                    if meal.get_caloric_value() < client.settings.min_сalories:
-                        filtered_dishes = filtered_dishes.exclude(id__in=[meal.id])
-            if client.settings.max_сalories:
-                for meal in filtered_dishes:
-                    if meal.get_caloric_value() > client.settings.max_сalories:
-                        filtered_dishes = filtered_dishes.exclude(id__in=[meal.id])
-
-            ingrs_to_filter = list(client.settings.chosen_ingrs.all())
-            if ingrs_to_filter:
-                filtered_dishes = Meal.objects.filter(ingredients_quant__ingredient__in=ingrs_to_filter)
-
-            ingrs_to_filter = list(client.settings.excluded_ingrs.all())
-            if ingrs_to_filter:
-                filtered_dishes = Meal.objects.exclude(ingredients_quant__ingredient__in=ingrs_to_filter)
 
             if context.user_data["is_showing_likes"]:
-                dishes_ids = [i.id for i in client.likes.all()]
-                filtered_dishes = filtered_dishes.filter(id__in=dishes_ids)
+                filtered_dishes = client.likes.all()
+            elif context.user_data["is_showing_dislikes"]:
+                filtered_dishes = client.dislikes.all()
+            else:
+                types_to_filter = list(client.settings.type_of_meal.all())
+                if types_to_filter:
+                    filtered_dishes = Meal.objects.filter(type_of_meal__in=types_to_filter)
+                else:
+                    filtered_dishes = Meal.objects.all()
 
-            dishes_ids = [i.id for i in client.dislikes.all()]
-            print(dishes_ids)
-            print(filtered_dishes.all())
-            filtered_dishes = filtered_dishes.exclude(id__in=dishes_ids)
-            print(filtered_dishes.all())
+                if client.settings.min_сalories:
+                    for meal in filtered_dishes:
+                        if meal.get_caloric_value() < client.settings.min_сalories:
+                            filtered_dishes = filtered_dishes.exclude(id__in=[meal.id])
+                if client.settings.max_сalories:
+                    for meal in filtered_dishes:
+                        if meal.get_caloric_value() > client.settings.max_сalories:
+                            filtered_dishes = filtered_dishes.exclude(id__in=[meal.id])
+
+                ingrs_to_filter = list(client.settings.chosen_ingrs.all())
+                if ingrs_to_filter:
+                    filtered_dishes = filtered_dishes.filter(ingredients_quant__ingredient__in=ingrs_to_filter)
+
+                ingrs_to_filter = list(client.settings.excluded_ingrs.all())
+                if ingrs_to_filter:
+                    filtered_dishes = filtered_dishes.exclude(ingredients_quant__ingredient__in=ingrs_to_filter)
+
+                dishes_ids = [i.id for i in client.dislikes.all()]
+                filtered_dishes = filtered_dishes.exclude(id__in=dishes_ids)
 
             context.user_data["filtered_dishes"] = filtered_dishes
-            if filtered_dishes.count() > 0:
-                cur_meal = filtered_dishes[context.user_data["cur_dish_id"]]
-            else:
+            if filtered_dishes.count() == 0:
                 update.effective_message.reply_text(
                     text="Блюд по таким фильтрам не найдено",
                     parse_mode=ParseMode.HTML
                 )
-                return 'MAIN_MENU'
+                return menu(update, context)
 
-            print(cur_meal.name)
+            cur_dish_id = context.user_data["cur_dish_id"]
+            cur_meal = filtered_dishes[cur_dish_id]
             text = ""
             if cur_meal in list(client.likes.all()):
                 text += "❤ "
-            text += f"""<b>{cur_meal.name}</b>.
+            text += f"""<b>Блюдо №{cur_dish_id + 1}: {cur_meal.name}</b>.
 <i>Калорийность - {cur_meal.get_caloric_value()} ккал</i>
 
 {cur_meal.description}"""
@@ -249,6 +244,10 @@ class Command(BaseCommand):
             context.user_data["is_showing_likes"] = True
             return show_dishes(update, context)
 
+        def show_dislikes(update, context):
+            context.user_data["is_showing_dislikes"] = True
+            return show_dishes(update, context)
+
         def like_dish(update, context):
             cur_dish = context.user_data["filtered_dishes"][context.user_data["cur_dish_id"]]
             Client.objects.get(id_telegram=context.user_data["user_id"]).dislikes.remove(cur_dish)
@@ -271,19 +270,23 @@ class Command(BaseCommand):
 
         def next_dish(update, context):
             cur_client = Client.objects.get(id_telegram=context.user_data["user_id"])
+            last_id = context.user_data["cur_dish_id"]
             if cur_client.is_paid_up:
-                if context.user_data["cur_dish_id"] < context.user_data["filtered_dishes"].count()-1:
-                    context.user_data["cur_dish_id"] += 1
-                    return show_dishes(update, context)
+                count_dishes = context.user_data["filtered_dishes"].count()
             else:
-                if context.user_data["cur_dish_id"] < 3 and context.user_data["cur_dish_id"] < context.user_data["filtered_dishes"].count()-1:
-                    context.user_data["cur_dish_id"] += 1
-                    return show_dishes(update, context)
+                count_dishes = 3
+            context.user_data["cur_dish_id"] = get_new_dish_id(last_id, count_dishes - 1, 'next')
+            return show_dishes(update, context)
 
         def prev_dish(update, context):
-            if context.user_data["cur_dish_id"] >= 1:
-                context.user_data["cur_dish_id"] -= 1
-                return show_dishes(update, context)
+            cur_client = Client.objects.get(id_telegram=context.user_data["user_id"])
+            last_id = context.user_data["cur_dish_id"]
+            if cur_client.is_paid_up:
+                count_dishes = context.user_data["filtered_dishes"].count()
+            else:
+                count_dishes = 3
+            context.user_data["cur_dish_id"] = get_new_dish_id(last_id, count_dishes - 1, 'prev')
+            return show_dishes(update, context)
 
         def show_filters(update, context):
             keyboard = [
@@ -340,7 +343,6 @@ class Command(BaseCommand):
             )
             Client.objects.get(id_telegram=context.user_data["user_id"]).settings.type_of_meal.add(MealType.objects.all()[context.user_data["ch_type"]])
             Client.objects.get(id_telegram=context.user_data["user_id"]).settings.save()
-            print(Client.objects.get(id_telegram=context.user_data["user_id"]).settings.type_of_meal.all())
             return show_filters(update, context)
 
         def filter_type_ch_1(update, context):
@@ -422,7 +424,7 @@ class Command(BaseCommand):
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             update.effective_message.reply_text(
-                text="Фильтр по содержанию ингредиенту",
+                text="Фильтр по содержанию ингредиента",
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
@@ -436,7 +438,6 @@ class Command(BaseCommand):
             )
             Client.objects.get(id_telegram=context.user_data["user_id"]).settings.chosen_ingrs.add(context.user_data["finded_ingrs"][context.user_data["ch_ingr"]])
             Client.objects.get(id_telegram=context.user_data["user_id"]).settings.save()
-            print(Client.objects.get(id_telegram=context.user_data["user_id"]).settings.chosen_ingrs.all())
             return show_filters(update, context)
 
         def filter_ingr_ch_1(update, context):
@@ -512,7 +513,6 @@ class Command(BaseCommand):
             )
             Client.objects.get(id_telegram=context.user_data["user_id"]).settings.excluded_ingrs.add(context.user_data["finded_ingrs"][context.user_data["ch_ingr"]])
             Client.objects.get(id_telegram=context.user_data["user_id"]).settings.save()
-            print(Client.objects.get(id_telegram=context.user_data["user_id"]).settings.excluded_ingrs.all())
             return show_filters(update, context)
 
         def filter_rem_ingr_ch_1(update, context):
@@ -637,9 +637,16 @@ class Command(BaseCommand):
                 ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
+
+            client = Client.objects.get(id_telegram=update.effective_user.id)
+            if client.is_paid_up:
+                text = "У вас уже олачена подписка на текущий месяц\nПродлить?"
+            else:
+                text = "Подписаться?\nСтоимость подписки 500,00 RUB в месяц"
+
             update.effective_message.reply_text(
                 # photo=cur_meal.image,
-                text="Оплатить подписку на 1 месяц 500,00 RUB",
+                text=text,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
@@ -653,7 +660,13 @@ class Command(BaseCommand):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             client = Client.objects.get(id_telegram=context.user_data["user_id"])
-            client.is_paid_up = True
+            client.renew_sub = True
+            if not client.is_paid_up:
+                client.is_paid_up = True
+                revenue = Revenue.objects.get_or_create()[0]
+                revenue.revenue_sum += SUBS_PRICE
+                revenue.save()
+                client.payment_date = get_new_payment_date()
             client.save()
             settings = Settings.objects.get_or_create(client=client)[0]
             settings.save()
@@ -689,7 +702,7 @@ class Command(BaseCommand):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             client = Client.objects.get(id_telegram=context.user_data["user_id"])
-            client.is_paid_up = False
+            client.renew_sub = False
             client.save()
             update.effective_message.reply_text(
                 # photo=cur_meal.image,
@@ -711,6 +724,7 @@ class Command(BaseCommand):
                     CallbackQueryHandler(show_dishes, pattern='to_dishes'),
                     CallbackQueryHandler(show_filters, pattern='to_filters'),
                     CallbackQueryHandler(show_likes, pattern='liked'),
+                    CallbackQueryHandler(show_dislikes, pattern='disliked'),
                     CallbackQueryHandler(send_invoice, pattern='to_payment'),
                     CallbackQueryHandler(cancel_sub, pattern='cancel_sub'),
                 ],
@@ -718,7 +732,7 @@ class Command(BaseCommand):
                     CallbackQueryHandler(prev_dish, pattern='prev_dish'),
                     CallbackQueryHandler(next_dish, pattern='next_dish'),
                     CallbackQueryHandler(cur_dish_info, pattern='dish_info'),
-                    CallbackQueryHandler(menu, pattern='menu'),
+                    CallbackQueryHandler(menu, pattern='to_menu'),
                 ],
                 'DISH_INFO': [
                     CallbackQueryHandler(like_dish, pattern='like_dish'),
