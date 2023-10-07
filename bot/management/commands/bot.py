@@ -41,6 +41,7 @@ class Command(BaseCommand):
             user_id = update.effective_user.id
             context.user_data['user_first_name'] = user_first_name
             context.user_data['user_id'] = user_id
+            context.user_data["chat_id"] = update.message.chat_id
 
             if not Client.objects.filter(id_telegram=user_id).exists():
                 Client.objects.create(
@@ -629,7 +630,21 @@ class Command(BaseCommand):
             )
             return show_filters(update, context)
 
-        def send_invoice(update, context):
+        def start_payment_callback(update, context):
+            """Sends an invoice without shipping-payment."""
+            chat_id = context.user_data["chat_id"]
+            title = "Оплатить подписку на 1 месяц 500,00 RUB"
+            description = "Оплата подписки на месяц"
+            # select a payload just for you to recognize its the donation from your bot
+            payload = "Custom-Payload"
+            # In order to get a provider_token see https://core.telegram.org/bots/payments#getting-a-token
+            provider_token = "1744374395:TEST:f2d78e84611a0ca6876e"
+            currency = "RUB"
+            # price in roubles
+            price = 500
+            # price * 100 so as to include 2 decimal points
+            prices = [LabeledPrice("Test", price * 100)]
+
             keyboard = [
                 [
                     InlineKeyboardButton("Подтвердить", callback_data='confirm'),
@@ -640,25 +655,30 @@ class Command(BaseCommand):
 
             client = Client.objects.get(id_telegram=update.effective_user.id)
             if client.is_paid_up:
-                text = "У вас уже олачена подписка на текущий месяц\nПродлить?"
+                text = "У вас уже оплачена подписка на текущий месяц.\nПродлить?"
             else:
                 text = "Подписаться?\nСтоимость подписки 500,00 RUB в месяц"
 
-            update.effective_message.reply_text(
-                # photo=cur_meal.image,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML
+            context.bot.send_invoice(
+                chat_id, title, text, payload, provider_token, currency, prices
             )
-            return "SEND_INVOICE"
+            return 'SEND_INVOICE'
 
-        def success_pay(update, context):
-            keyboard = [
-                [
-                    InlineKeyboardButton("В главное меню", callback_data='to_menu'),
-                ],
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        # after (optional) shipping, it's the pre-checkout
+        def precheckout_callback(update, context):
+            """Answers the PreQecheckoutQuery"""
+            query = update.pre_checkout_query
+            # check the payload, is this from your bot?
+            if query.invoice_payload != 'Custom-Payload':
+                # answer False pre_checkout_query
+                query.answer(ok=False, error_message="Something went wrong...")
+            else:
+                query.answer(ok=True)
+
+        # finally, after contacting the payment provider...
+        def successful_payment_callback(update, context):
+            """Confirms the successful payment."""
+            # do something after successfully receiving payment?
             client = Client.objects.get(id_telegram=context.user_data["user_id"])
             client.renew_sub = True
             if not client.is_paid_up:
@@ -670,13 +690,14 @@ class Command(BaseCommand):
             client.save()
             settings = Settings.objects.get_or_create(client=client)[0]
             settings.save()
-            update.effective_message.reply_text(
-                # photo=cur_meal.image,
-                text="Подписка успешно оформлена✅",
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML
-            )
-            return 'SUCCESS_PAYMENT'
+            keyboard = [
+                [
+                    InlineKeyboardButton("В главное меню", callback_data='to_menu'),
+                ],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text("Подписка успешно оформлена✅", reply_markup=reply_markup)
+            return 'SUCESS_PAYMENT'
 
         def cancel_sub(update, context):
             keyboard = [
@@ -717,7 +738,7 @@ class Command(BaseCommand):
             states={
                 'GREETINGS': [
                     CallbackQueryHandler(menu, pattern='to_menu'),
-                    CallbackQueryHandler(send_invoice, pattern='to_payment'),
+                    CallbackQueryHandler(start_payment_callback, pattern='to_payment'),
                     CallbackQueryHandler(cancel_sub, pattern='cancel_sub'),
                 ],
                 'MAIN_MENU': [
@@ -725,7 +746,7 @@ class Command(BaseCommand):
                     CallbackQueryHandler(show_filters, pattern='to_filters'),
                     CallbackQueryHandler(show_likes, pattern='liked'),
                     CallbackQueryHandler(show_dislikes, pattern='disliked'),
-                    CallbackQueryHandler(send_invoice, pattern='to_payment'),
+                    CallbackQueryHandler(start_payment_callback, pattern='to_payment'),
                     CallbackQueryHandler(cancel_sub, pattern='cancel_sub'),
                 ],
                 'CUR_DISH': [
@@ -740,7 +761,7 @@ class Command(BaseCommand):
                     CallbackQueryHandler(show_dishes, pattern='to_dishes'),
                 ],
                 'SEND_INVOICE': [
-                    CallbackQueryHandler(success_pay, pattern='confirm'),
+                    CallbackQueryHandler(successful_payment_callback, pattern='confirm'),
                     CallbackQueryHandler(menu, pattern='to_menu'),
                     # CallbackQueryHandler(make_order, pattern='cancel'),
                 ],
@@ -816,6 +837,9 @@ class Command(BaseCommand):
         )
 
         dispatcher.add_handler(conv_handler)
+        # Оплата
+        dispatcher.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+        dispatcher.add_handler(MessageHandler(Filters.successful_payment, successful_payment_callback))
         dispatcher.bot_data["cur_dish_id"] = 1
         start_handler = CommandHandler('start', start_conversation)
         dispatcher.add_handler(start_handler)
